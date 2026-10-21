@@ -13,7 +13,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		A10000000000000000000020 /* SportsApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SportsApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000020 /* Halftime.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Halftime.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000021 /* SportsKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = SportsKit; sourceTree = "<group>"; };
 		B10000000000000000000020 /* SportsWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SportsWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -80,7 +80,7 @@
 		A10000000000000000000051 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A10000000000000000000020 /* SportsApp.app */,
+				A10000000000000000000020 /* Halftime.app */,
 				B10000000000000000000020 /* SportsWidgets.appex */,
 			);
 			name = Products;
@@ -111,7 +111,7 @@
 				A10000000000000000000011 /* SportsKit */,
 			);
 			productName = SportsApp;
-			productReference = A10000000000000000000020 /* SportsApp.app */;
+			productReference = A10000000000000000000020 /* Halftime.app */;
 			productType = "com.apple.product-type.application";
 		};
 		B10000000000000000000060 /* SportsWidgets */ = {
@@ -259,12 +259,12 @@
 				CODE_SIGN_STYLE = Automatic;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 25;
+				CURRENT_PROJECT_VERSION = 26;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Sports;
+				INFOPLIST_KEY_CFBundleDisplayName = Halftime;
 				INFOPLIST_FILE = "Config/SportsApp-Info.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.sports";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -273,7 +273,8 @@
 				);
 				MARKETING_VERSION = 0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.marcuscunningham.SportsApp;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_MODULE_NAME = SportsApp;
+				PRODUCT_NAME = Halftime;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_VERSION = 6.0;
@@ -289,12 +290,12 @@
 				CODE_SIGN_STYLE = Automatic;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 25;
+				CURRENT_PROJECT_VERSION = 26;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Sports;
+				INFOPLIST_KEY_CFBundleDisplayName = Halftime;
 				INFOPLIST_FILE = "Config/SportsApp-Info.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.sports";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -303,7 +304,8 @@
 				);
 				MARKETING_VERSION = 0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.marcuscunningham.SportsApp;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_MODULE_NAME = SportsApp;
+				PRODUCT_NAME = Halftime;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_VERSION = 6.0;
@@ -317,14 +319,14 @@
 				ENABLE_DEBUG_DYLIB = NO;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 25;
+				CURRENT_PROJECT_VERSION = 26;
 				DEVELOPMENT_TEAM = 9C872WSWWS;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Config/SportsWidgets-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = Sports;
+				INFOPLIST_KEY_CFBundleDisplayName = Halftime;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -347,14 +349,14 @@
 				ENABLE_DEBUG_DYLIB = NO;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 25;
+				CURRENT_PROJECT_VERSION = 26;
 				DEVELOPMENT_TEAM = 9C872WSWWS;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Config/SportsWidgets-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = Sports;
+				INFOPLIST_KEY_CFBundleDisplayName = Halftime;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",

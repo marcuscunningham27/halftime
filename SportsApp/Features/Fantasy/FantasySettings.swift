@@ -36,7 +36,7 @@ struct FantasySettings: View {
                 case .sleeper: SleeperAdder()
                 case .espn: ESPNAdder()
                 case .yahoo:
-                    Text("Yahoo Fantasy only lets apps in through a Yahoo sign-in tied to a registered Yahoo developer app, which Sports doesn’t have yet.")
+                    Text("Yahoo Fantasy only lets apps in through a Yahoo sign-in tied to a registered Yahoo developer app, which Halftime doesn’t have yet.")
                         .foregroundStyle(.secondary)
                 }
             }

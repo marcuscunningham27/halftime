@@ -73,15 +73,15 @@ struct GeneralSettings: View {
                 if let error {
                     Text(error).foregroundStyle(.red)
                 } else if SMAppService.mainApp.status == .requiresApproval {
-                    Text("Approve Sports in System Settings › General › Login Items.")
+                    Text("Approve Halftime in System Settings › General › Login Items.")
                 } else {
-                    Text("Alerts only arrive while Sports is running, so it stays in the menu bar.")
+                    Text("Alerts only arrive while Halftime is running, so it stays in the menu bar.")
                 }
             }
             Section {
                 Toggle("Close to Menu", isOn: $closeToMenu)
             } footer: {
-                Text("Closing the window leaves Sports in the menu bar only, with no Dock icon. Scores and alerts keep coming.")
+                Text("Closing the window leaves Halftime in the menu bar only, with no Dock icon. Scores and alerts keep coming.")
             }
             Section {
                 Picker("Units", selection: $units) {
@@ -108,7 +108,7 @@ struct NotificationSettings: View {
                     Section {
                         Label {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Notifications are turned off for Sports").font(.headline)
+                                Text("Notifications are turned off for Halftime").font(.headline)
                                 Text("Allow them in System Settings to get alerts for the teams and leagues you follow.")
                                     .foregroundStyle(.secondary)
                             }
@@ -169,7 +169,7 @@ struct FollowingSettings: View {
             Form {
                 if leagues.isEmpty && teams.isEmpty {
                     ContentUnavailableView("Nothing Followed Yet", systemImage: "star",
-                                           description: Text("Star a team or league in the Sports window."))
+                                           description: Text("Star a team or league in the Halftime window."))
                 }
                 if !leagues.isEmpty {
                     Section("Leagues") {

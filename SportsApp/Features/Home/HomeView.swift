@@ -58,7 +58,19 @@ struct HomeView: View {
             .backdrop(.sportsGreen)
             .environment(\.colorScheme, .dark)
             .navigationTitle("Home")
+            // The app's wordmark in place of the plain title, as iOS Sports shows its own.
+            .toolbar(removing: .title)
             .toolbar {
+                ToolbarItem(placement: .navigation) {
+                    HStack(spacing: 8) {
+                        HalftimeMark(size: 32)
+                        Text("Halftime").font(.system(size: 30, weight: .bold))
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Halftime")
+                }
+                .sharedBackgroundVisibility(.hidden)
+                ToolbarSpacer(.flexible)
                 ToolbarItem {
                     Button("Refresh", systemImage: "arrow.clockwise") { Task { await poller?.refresh() } }
                         .keyboardShortcut("r")
@@ -117,5 +129,23 @@ struct HomeView: View {
     private func ordered(_ games: [Game]) -> [Game] {
         let order: [Game.Status] = [.live, .scheduled, .final]
         return games.sorted { order.firstIndex(of: $0.status)! < order.firstIndex(of: $1.status)! }
+    }
+}
+
+/// The app icon's markings (halfway line, centre circle and spot) on a clear glass tile, without its colours.
+struct HalftimeMark: View {
+    var size: CGFloat = 24
+
+    var body: some View {
+        let line = size * 0.055
+        ZStack {
+            Rectangle().frame(width: line)
+            Circle().stroke(lineWidth: line).frame(width: size * 0.44, height: size * 0.44)
+            Circle().frame(width: size * 0.1, height: size * 0.1)
+        }
+        .foregroundStyle(.white.opacity(0.9))
+        .frame(width: size, height: size)
+        .clipShape(.rect(cornerRadius: size * 0.24))
+        .glassEffect(.clear, in: .rect(cornerRadius: size * 0.24))
     }
 }

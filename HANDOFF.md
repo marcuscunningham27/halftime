@@ -1,6 +1,6 @@
-# Sports app: handoff
+# Halftime (sports app): handoff
 
-Native macOS sports app (SwiftUI, macOS 26, Swift 6, Liquid Glass), modelled on Apple's iOS Sports app and ESPN.
+Native macOS sports app called **Halftime** (SwiftUI, macOS 26, Swift 6, Liquid Glass), modelled on Apple's iOS Sports app and ESPN.
 The original brief is `Mac Sports App — Claude Code Spec.md`. Last updated 21 October 2026.
 
 ## Goal
@@ -69,6 +69,18 @@ All 8 phases of the spec are done, plus a lot of extra design work.
 
 Tests: 124 passing in SportsKit.
 
+## Name and icon
+
+- Shown everywhere as **Halftime** (display name, `PRODUCT_NAME = Halftime`, so the built app is `Halftime.app`).
+  The bundle IDs (`com.marcuscunningham.SportsApp`, `.Widgets`), App Group, Keychain services, Xcode target,
+  scheme and Swift module (`PRODUCT_MODULE_NAME = SportsApp`) keep the old name on purpose, so saved settings,
+  follows and fantasy leagues carry over.
+- Icon (`SportsApp/AppIcon.icon`): a halfway line, centre circle and spot in white over a green left half and
+  blue right half (`background.png`, glass translucency off so the colours stay rich). The layers are drawn
+  by a small CoreGraphics script; macOS caches icons, so an old icon can linger in the Dock until it restarts.
+- Home's toolbar shows a "Halftime" wordmark with `HalftimeMark` (the icon's markings on a clear glass tile,
+  in `HomeView.swift`) instead of the plain "Home" title.
+
 ## Layout and key files
 
 - `SportsKit/` (local Swift package): models, providers and logic. Logic is kept here so it can be unit-tested.
@@ -100,11 +112,11 @@ Tests: 124 passing in SportsKit.
 ## Build and run
 
 - `xcodebuild -project SportsApp.xcodeproj -scheme SportsApp -configuration Debug -allowProvisioningUpdates build`,
-  then open `~/Library/Developer/Xcode/DerivedData/SportsApp-blqwxhtuufmkyjhcpilwreraremh/Build/Products/Debug/SportsApp.app`.
-  Run `pkill -x SportsApp` first, or `open` just brings the old build forward.
+  then open `~/Library/Developer/Xcode/DerivedData/SportsApp-blqwxhtuufmkyjhcpilwreraremh/Build/Products/Debug/Halftime.app`.
+  Run `pkill -x Halftime` first, or `open` just brings the old build forward.
 - Run tests outside ~/Documents (codesign fails on extended attributes):
   `cd SportsKit && swift test --scratch-path <scratchpad>/skbuild`.
-- Widgets: bump `CURRENT_PROJECT_VERSION` (currently 25) and run `lsregister -f` on the app whenever widget
+- Widgets: bump `CURRENT_PROJECT_VERSION` (currently 26) and run `lsregister -f` on the app whenever widget
   code **or SportsKit** changes (the widget links SportsKit). Otherwise widgets draw grey placeholders and
   chronod logs "Bundle version did not match". `killall chronod` makes them reload straight away.
 - The user checks things visually. Check changes in the running app (the computer-use tools work; macOS

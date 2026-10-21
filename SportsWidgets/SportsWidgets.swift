@@ -45,7 +45,7 @@ struct MyTeamsProvider: TimelineProvider {
     private func load() async -> GamesEntry {
         let teams = WidgetTeam.load()
         let leagues = WidgetTeam.loadLeagues().compactMap(League.with)
-        guard !teams.isEmpty || !leagues.isEmpty else { return GamesEntry(message: "Follow a team in Sports") }
+        guard !teams.isEmpty || !leagues.isEmpty else { return GamesEntry(message: "Follow a team in Halftime") }
         let provider = ESPNProvider()
         // Each followed team's live, next or last game, fetched in parallel, in follow order.
         let found = await withTaskGroup(of: (Int, Game?).self) { group in

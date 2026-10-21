@@ -21,7 +21,7 @@ struct MenuBarLabel: View {
                     .monospacedDigit()
             } else {
                 Image(systemName: "sportscourt")
-                    .accessibilityLabel("Sports")
+                    .accessibilityLabel("Halftime")
             }
         }
         // Restarts, and refetches at once, whenever the set of followed leagues changes.

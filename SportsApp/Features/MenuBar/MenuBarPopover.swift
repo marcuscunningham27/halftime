@@ -18,7 +18,7 @@ struct MenuBarPopover: View {
                 .font(.headline)
             if follows.isEmpty {
                 ContentUnavailableView("Nothing Followed Yet", systemImage: "star",
-                                       description: Text("Star a team or league in Sports to see its games here."))
+                                       description: Text("Star a team or league in Halftime to see its games here."))
                     .frame(height: 180)
             } else if games.isEmpty {
                 ContentUnavailableView("No Live or Upcoming Games", systemImage: "sportscourt")
@@ -42,7 +42,7 @@ struct MenuBarPopover: View {
             }
             HStack {
                 Button(action: openMainWindow) {
-                    Label("Open Sports", systemImage: "macwindow")
+                    Label("Open Halftime", systemImage: "macwindow")
                         .frame(maxWidth: .infinity)
                 }
                 SettingsLink {
