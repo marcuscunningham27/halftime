@@ -79,6 +79,16 @@ private let fixtures: [LeagueFixture] = [
         #expect(box.rows.count == 16)
     }
 
+    @Test func soccerShotsComeFromTheCommentary() throws {
+        let shots = try ESPNProvider.parseSummary(data("epl-summary"), leagueID: League.epl.id).shots
+        let count = Dictionary(grouping: shots, by: \.outcome).mapValues(\.count)
+        #expect(count == [.goal: 4, .save: 2, .offTarget: 14, .block: 8])
+        #expect(Set(shots.map(\.teamID)) == ["367", "388"])
+        // Headers, volleys and penalties count as goals; the own goal isn't a shot.
+        let ucl = try ESPNProvider.parseSummary(data("ucl-summary"), leagueID: League.ucl.id).shots
+        #expect(ucl.filter { $0.outcome == .goal }.count == 3)
+    }
+
     @Test func everyKnownLeagueHasAnESPNMapping() async {
         #expect(await ESPNProvider().leagues() == League.all)
     }

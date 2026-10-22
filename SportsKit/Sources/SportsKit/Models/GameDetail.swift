@@ -10,6 +10,8 @@ public struct GameDetail: Hashable, Sendable {
     public let overview: GameOverview
     /// Timeouts, fouls and bonus for each team (NBA only, filled in while live).
     public var court: CourtSituation?
+    /// Every located shot, for the soccer shot map (from ESPN's match commentary).
+    public var shots: [Shot] = []
 
     public init(plays: [Play], drives: [Drive] = [], boxScores: [BoxScore], teamStats: [TeamStat],
                 overview: GameOverview = GameOverview()) {
@@ -18,6 +20,29 @@ public struct GameDetail: Hashable, Sendable {
         self.boxScores = boxScores
         self.teamStats = teamStats
         self.overview = overview
+    }
+}
+
+/// One attempt on goal and where it was taken from.
+public struct Shot: Identifiable, Hashable, Sendable {
+    public enum Outcome: String, CaseIterable, Sendable {
+        case goal, save, offTarget, block
+    }
+
+    public let id: String
+    public let teamID: Team.ID
+    public let outcome: Outcome
+    /// 0–1 of the pitch, in the shooting team's frame: x toward the goal it attacks, y across.
+    public let location: Play.Location
+    /// e.g. "Brandon Thomas-Asante Shot Block · 8'"
+    public let text: String
+
+    public init(id: String, teamID: Team.ID, outcome: Outcome, location: Play.Location, text: String) {
+        self.id = id
+        self.teamID = teamID
+        self.outcome = outcome
+        self.location = location
+        self.text = text
     }
 }
 

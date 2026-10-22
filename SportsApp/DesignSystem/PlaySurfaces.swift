@@ -39,8 +39,8 @@ struct PlaySurfaceView: View {
                 .frame(maxWidth: 600)
             }
         case League.epl.id, League.ucl.id, League.mls.id:
-            if !(detail?.plays.filter { $0.location != nil }.isEmpty ?? true) {
-                SoccerPitchView(game: game, plays: detail?.plays.filter { $0.location != nil } ?? []).frame(maxWidth: 560)
+            if let shots = detail?.shots, !shots.isEmpty {
+                SoccerPitchView(game: game, shots: shots).frame(maxWidth: 600)
             }
         default:
             EmptyView()
@@ -477,36 +477,70 @@ struct HockeyRinkView: View {
 
 // MARK: - Soccer
 
-/// Pitch with where the key moments (goals) happened; the home side attacks right, the away side left.
-/// Drawn in metres (105 × 68).
+/// ESPN-style shot map: a flat pitch with every shot marked by how it ended, the home side shooting
+/// right and the away side left. Drawn in metres (105 × 68).
 struct SoccerPitchView: View {
     let game: Game
-    let plays: [Play]
+    let shots: [Shot]
 
     var body: some View {
-        Canvas { context, size in
-            let scale = size.width / 105
-            context.scaleBy(x: scale, y: scale)
-            drawPitch(&context)
-            for play in plays {
-                guard let location = play.location, let team = team(of: play, in: game) else { continue }
-                let home = team.id == game.home.team.id
-                let point = CGPoint(x: home ? location.x * 105 : (1 - location.x) * 105, y: (home ? location.y : 1 - location.y) * 68)
-                let ring = CGRect(x: point.x - 2.6, y: point.y - 2.6, width: 5.2, height: 5.2)
-                context.fill(Path(ellipseIn: ring), with: .color(team.color))
-                context.stroke(Path(ellipseIn: ring), with: .color(.white), lineWidth: 0.6)
+        VStack(spacing: 10) {
+            HStack {
+                LegendItem(team: game.away.team, text: "\(count(game.away.team)) shots")
+                Spacer()
+                LegendItem(team: game.home.team, text: "\(count(game.home.team)) shots")
+            }
+            VStack(spacing: 0) {
+                Canvas { context, size in
+                    context.scaleBy(x: size.width / 105, y: size.width / 105)
+                    drawPitch(&context)
+                }
+                .aspectRatio(105 / 68, contentMode: .fit)
+                .overlay {
+                    GeometryReader { geo in
+                        // Goals last, so they sit on top of nearby misses.
+                        ForEach(shots.sorted { ($0.outcome == .goal ? 1 : 0) < ($1.outcome == .goal ? 1 : 0) }) { shot in
+                            ShotMarker(outcome: shot.outcome)
+                                .position(point(shot, in: geo.size))
+                                .help(shot.text)
+                        }
+                    }
+                }
+                // The pitch's front edge, for the same raised look as the football field.
+                Color.turfDark.brightness(-0.25).frame(height: 7)
+            }
+            .clipShape(.rect(cornerRadius: 8))
+            .rotation3DEffect(.degrees(22), axis: (x: 1, y: 0, z: 0), perspective: 0.5)
+            HStack(spacing: 6) {
+                ForEach(Shot.Outcome.allCases, id: \.self) { outcome in
+                    HStack(spacing: 5) {
+                        ShotMarker(outcome: outcome)
+                        Text(outcome.title).font(.caption.weight(.medium))
+                    }
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .background(.white.opacity(0.1), in: .capsule)
+                }
             }
         }
-        .aspectRatio(105 / 68, contentMode: .fit)
-        .rotation3DEffect(.degrees(22), axis: (x: 1, y: 0, z: 0), perspective: 0.5)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Pitch with \(plays.count) goals marked")
+        .accessibilityLabel("Shot map: " + Shot.Outcome.allCases.map { outcome in
+            "\(shots.filter { $0.outcome == outcome }.count) \(outcome.title.lowercased())"
+        }.joined(separator: ", "))
+    }
+
+    private func count(_ team: Team) -> Int { shots.filter { $0.teamID == team.id }.count }
+
+    /// Each team's shots come in its own attacking frame; the away side's are turned to face left.
+    private func point(_ shot: Shot, in size: CGSize) -> CGPoint {
+        let home = shot.teamID == game.home.team.id
+        return CGPoint(x: (home ? shot.location.x : 1 - shot.location.x) * size.width,
+                       y: (home ? shot.location.y : 1 - shot.location.y) * size.height)
     }
 
     private func drawPitch(_ context: inout GraphicsContext) {
-        for stripe in 0..<10 {
-            context.fill(Path(CGRect(x: CGFloat(stripe) * 10.5, y: 0, width: 10.5, height: 68)),
-                         with: .color(stripe.isMultiple(of: 2) ? Color(red: 0.22, green: 0.55, blue: 0.25) : Color(red: 0.25, green: 0.6, blue: 0.28)))
+        for stripe in 0..<6 {
+            context.fill(Path(CGRect(x: CGFloat(stripe) * 17.5, y: 0, width: 17.5, height: 68)),
+                         with: .color(stripe.isMultiple(of: 2) ? Color.turfDark : Color.turfLight))
         }
         let line = GraphicsContext.Shading.color(.white.opacity(0.85))
         context.stroke(Path(CGRect(x: 0, y: 0, width: 105, height: 68)), with: line, lineWidth: 0.4)
@@ -518,6 +552,39 @@ struct SoccerPitchView: View {
             context.stroke(Path(CGRect(x: left ? 0 : 105 - 16.5, y: 34 - 20.15, width: 16.5, height: 40.3)), with: line, lineWidth: 0.4)
             context.stroke(Path(CGRect(x: left ? 0 : 105 - 5.5, y: 34 - 9.15, width: 5.5, height: 18.3)), with: line, lineWidth: 0.4)
             context.fill(Path(ellipseIn: CGRect(x: x + dir * 11 - 0.4, y: 33.6, width: 0.8, height: 0.8)), with: line)
+        }
+    }
+}
+
+/// ESPN's shot icons: a white disc showing how the shot ended.
+private struct ShotMarker: View {
+    let outcome: Shot.Outcome
+
+    var body: some View {
+        ZStack {
+            Circle().fill(.white)
+            Circle().strokeBorder(.black.opacity(0.75), lineWidth: 1.3)
+            switch outcome {
+            case .goal: Image(systemName: "soccerball").font(.system(size: 14, weight: .semibold))
+            case .save: Image(systemName: "nosign").font(.system(size: 10, weight: .bold))
+            case .block: Circle().frame(width: 5, height: 5)
+            case .offTarget: EmptyView()
+            }
+        }
+        .foregroundStyle(.black.opacity(0.8))
+        // Goals a size up, as on ESPN, so they stand out from the misses.
+        .frame(width: outcome == .goal ? 20 : 16, height: outcome == .goal ? 20 : 16)
+        .shadow(color: .black.opacity(0.25), radius: 1, y: 0.5)
+    }
+}
+
+extension Shot.Outcome {
+    var title: String {
+        switch self {
+        case .goal: "Goal"
+        case .save: "Save"
+        case .offTarget: "Off Target"
+        case .block: "Block"
         }
     }
 }

@@ -260,8 +260,13 @@ public actor ESPNProvider: SportsProvider {
                 return TeamStat(id: index, label: label, away: awayValue, home: homeValue)
             }
         }
-        return GameDetail(plays: plays, drives: modelDrives, boxScores: boxScores, teamStats: teamStats,
-                          overview: summary.overview)
+        var detail = GameDetail(plays: plays, drives: modelDrives, boxScores: boxScores, teamStats: teamStats,
+                                overview: summary.overview)
+        // Commentary names teams but gives no IDs, so match them through the line-ups.
+        let teamIDs = Dictionary((summary.rosters ?? []).compactMap { r in r.team.displayName.map { ($0, r.team.id) } },
+                                 uniquingKeysWith: { first, _ in first })
+        detail.shots = (summary.commentary ?? []).compactMap { $0.play?.shot(teamIDs: teamIDs) }
+        return detail
     }
 
     static func parseScoreboard(_ data: Data, leagueID: League.ID) throws -> [Game] {
@@ -516,6 +521,7 @@ private struct TeamRefDTO: Decodable {
 private struct SummaryDTO: Decodable {
     let boxscore: BoxscoreDTO?
     let rosters: [RosterDTO]?
+    let commentary: [CommentaryDTO]?
     let drives: DrivesDTO?
     let plays: [DrivesDTO.PlayDTO]?
     let keyEvents: [DrivesDTO.PlayDTO]?
@@ -732,6 +738,41 @@ private struct BoxscoreDTO: Decodable {
 
     let teams: [TeamStatsDTO]?
     let players: [PlayersDTO]?
+}
+
+/// A line of soccer match commentary; shots carry where they were taken from.
+private struct CommentaryDTO: Decodable {
+    struct PlayDTO: Decodable {
+        struct TypeDTO: Decodable { let type: String? }
+        struct TeamDTO: Decodable { let displayName: String? }
+        struct ClockDTO: Decodable { let displayValue: String? }
+
+        let id: String
+        let type: TypeDTO?
+        let team: TeamDTO?
+        let shortText: String?
+        let clock: ClockDTO?
+        let fieldPositionX: Double?
+        let fieldPositionY: Double?
+
+        /// nil for anything that isn't an attempt on goal (own goals included) or has no spot.
+        func shot(teamIDs: [String: Team.ID]) -> Shot? {
+            let kind = type?.type ?? ""
+            let outcome: Shot.Outcome? = switch kind {
+            case _ where kind.hasPrefix("goal"), "penalty---scored": .goal
+            case "shot-on-target", "penalty---saved": .save
+            case "shot-off-target", "penalty---missed": .offTarget
+            case "shot-blocked": .block
+            default: nil
+            }
+            guard let outcome, let x = fieldPositionX, let y = fieldPositionY,
+                  let name = team?.displayName, let teamID = teamIDs[name] else { return nil }
+            return Shot(id: id, teamID: teamID, outcome: outcome, location: .init(x: x / 100, y: y / 100),
+                        text: [shortText, clock?.displayValue].compactMap { $0 }.joined(separator: " · "))
+        }
+    }
+
+    let play: PlayDTO?
 }
 
 /// A soccer line-up, with each player's match stats.
