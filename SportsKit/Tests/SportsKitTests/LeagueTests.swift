@@ -35,6 +35,10 @@ private let fixtures: [LeagueFixture] = [
           compactPeriod: "P3", plays: 311, scoringPlays: 7, teamStats: 14, boxScores: 8),
     .init(league: .epl, games: 1, gameID: "401879257", status: .final, home: ("TOT", 3), away: ("COV", 1),
           compactPeriod: "FT", plays: 34, scoringPlays: 4, teamStats: 28, boxScores: 2),
+    .init(league: .ucl, games: 9, gameID: "401915394", status: .final, home: ("AVL", 3), away: ("VFK", 1),
+          compactPeriod: "FT", plays: 26, scoringPlays: 4, teamStats: 28, boxScores: 2),
+    .init(league: .mls, games: 1, gameID: "761773", status: .final, home: ("CIN", 2), away: ("DC", 1),
+          compactPeriod: "FT", plays: 22, scoringPlays: 3, teamStats: 28, boxScores: 2),
 ]
 
 @Suite struct LeagueFixtureTests {
@@ -125,6 +129,14 @@ private let fixtures: [LeagueFixture] = [
         #expect(east.entries.map(\.team.abbreviation) == ["BUF", "NE", "NYJ", "MIA"])
         #expect(east.entries.first?.values == ["5", "1", "0", ".833"])
         #expect(east.entries.first?.team.logoURL != nil)
+    }
+
+    @Test func soccerTables() throws {
+        let mls = try standings(.mls)
+        #expect(mls.columns == ["GP", "W", "D", "L", "GD", "PTS"])
+        #expect(mls.groups.map(\.entries.count) == [15, 15])
+        // The Champions League's league phase is one 36-team table.
+        #expect(try standings(.ucl).groups.map(\.entries.count) == [36])
     }
 
     @Test func nbaIsRankedByWinPercentage() throws {

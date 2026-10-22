@@ -1,3 +1,5 @@
+import Foundation
+
 public struct League: Identifiable, Hashable, Sendable {
     /// How a sport divides a game; drives period labels and which alerts make sense.
     public enum PeriodStyle: Hashable, Sendable {
@@ -68,10 +70,19 @@ public struct League: Identifiable, Hashable, Sendable {
     public static let nhl = League(id: "nhl", name: "National Hockey League", abbreviation: "NHL", periodStyle: .periods,
                                    closeGameMargin: 1, closeGameSeconds: 300)
     public static let epl = League(id: "epl", name: "Premier League", abbreviation: "EPL", periodStyle: .halves)
+    public static let ucl = League(id: "ucl", name: "UEFA Champions League", abbreviation: "UCL", periodStyle: .halves)
+    public static let mls = League(id: "mls", name: "Major League Soccer", abbreviation: "MLS", periodStyle: .halves)
 
     /// Every league the app knows about, in sidebar order; providers say which ones they can serve.
     /// AFL and NRL were dropped (Oct 2026): ESPN's data for them is too thin. Follows of theirs are pruned on launch.
-    public static let all: [League] = [.nfl, .nba, .wnba, .mlb, .nhl, .epl]
+    public static let all: [League] = [.nfl, .nba, .wnba, .mlb, .nhl, .epl, .ucl, .mls]
+
+    /// ESPN's league logo, for section headers. Soccer logos are filed under ESPN's numeric league IDs.
+    public var logoURL: URL? {
+        let soccer = [League.epl.id: 23, League.ucl.id: 2, League.mls.id: 19]
+        return URL(string: soccer[id].map { "https://a.espncdn.com/i/leaguelogos/soccer/500/\($0).png" }
+            ?? "https://a.espncdn.com/i/teamlogos/leagues/500/\(id).png")
+    }
 
     public static func with(id: League.ID) -> League? {
         all.first { $0.id == id }

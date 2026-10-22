@@ -38,7 +38,7 @@ struct PlaySurfaceView: View {
                 }
                 .frame(maxWidth: 600)
             }
-        case League.epl.id:
+        case League.epl.id, League.ucl.id, League.mls.id:
             if !(detail?.plays.filter { $0.location != nil }.isEmpty ?? true) {
                 SoccerPitchView(game: game, plays: detail?.plays.filter { $0.location != nil } ?? []).frame(maxWidth: 560)
             }

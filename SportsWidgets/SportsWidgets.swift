@@ -78,11 +78,11 @@ struct MyTeamsProvider: TimelineProvider {
 // MARK: - League
 
 enum LeagueOption: String, AppEnum {
-    case nfl, nba, wnba, mlb, nhl, epl
+    case nfl, nba, wnba, mlb, nhl, epl, ucl, mls
 
     static let typeDisplayRepresentation: TypeDisplayRepresentation = "League"
     static let caseDisplayRepresentations: [LeagueOption: DisplayRepresentation] = [
-        .nfl: "NFL", .nba: "NBA", .wnba: "WNBA", .mlb: "MLB", .nhl: "NHL", .epl: "Premier League",
+        .nfl: "NFL", .nba: "NBA", .wnba: "WNBA", .mlb: "MLB", .nhl: "NHL", .epl: "Premier League", .ucl: "Champions League", .mls: "MLS",
     ]
 
     var league: League { League.with(id: rawValue) ?? .nfl }
@@ -212,13 +212,6 @@ struct GamesEntry: TimelineEntry {
     }
 }
 
-extension League {
-    var logoURL: URL? {
-        URL(string: id == League.epl.id
-            ? "https://a.espncdn.com/i/leaguelogos/soccer/500/23.png"
-            : "https://a.espncdn.com/i/teamlogos/leagues/500/\(id).png")
-    }
-}
 
 // MARK: - Views
 

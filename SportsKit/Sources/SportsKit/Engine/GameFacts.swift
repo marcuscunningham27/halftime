@@ -337,7 +337,7 @@ public struct QuickQuestion: Hashable, Sendable, Identifiable {
             .init("How did the power plays go?", .teamStats(["Power Play Goals", "Power Play Opportunities"])),
             .init("Which team controlled the shots?", .teamStats(["Shots", "Blocked Shots"])),
         ]
-        case League.epl.id: [
+        case League.epl.id, League.ucl.id, League.mls.id: [
             .init("Who scored and when?", .scoring),
             .init("Which team had more of the ball?", .teamStats(["Possession", "Passes"])),
             .init("Who were the standout players?", .model),

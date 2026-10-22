@@ -12,6 +12,8 @@ enum ESPNEndpoints {
         League.mlb.id: "baseball/mlb",
         League.nhl.id: "hockey/nhl",
         League.epl.id: "soccer/eng.1",
+        League.ucl.id: "soccer/uefa.champions",
+        League.mls.id: "soccer/usa.1",
     ]
 
     /// nil asks for ESPN's "current" slate: this week for NFL, the latest round for off-season leagues.
@@ -40,6 +42,11 @@ enum ESPNEndpoints {
         let columns: [(stat: String, label: String)]
         /// Higher is better, compared in order.
         let rankBy: [String]
+
+        /// Every soccer league's table: points, then goal difference, then goals scored.
+        static let soccer = StandingsSpec(level: nil, columns: [("gamesPlayed", "GP"), ("wins", "W"), ("ties", "D"), ("losses", "L"),
+                                                                ("pointDifferential", "GD"), ("points", "PTS")],
+                                          rankBy: ["points", "pointDifferential", "pointsFor"])
     }
 
     static let standingsSpecs: [League.ID: StandingsSpec] = [
@@ -53,9 +60,9 @@ enum ESPNEndpoints {
                              rankBy: ["winPercent", "wins"]),
         League.nhl.id: .init(level: 3, columns: [("gamesPlayed", "GP"), ("wins", "W"), ("losses", "L"), ("otLosses", "OTL"), ("points", "PTS")],
                              rankBy: ["points", "wins"]),
-        League.epl.id: .init(level: nil, columns: [("gamesPlayed", "GP"), ("wins", "W"), ("ties", "D"), ("losses", "L"),
-                                                    ("pointDifferential", "GD"), ("points", "PTS")],
-                             rankBy: ["points", "pointDifferential", "pointsFor"]),
+        League.epl.id: .soccer,
+        League.ucl.id: .soccer,
+        League.mls.id: .soccer,
     ]
 
     /// ESPN's core API, where "football/nfl" is written "football/leagues/nfl".

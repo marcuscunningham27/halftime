@@ -8,20 +8,12 @@ extension League {
         case League.nba.id, League.wnba.id: "basketball"
         case League.mlb.id: "baseball"
         case League.nhl.id: "hockey.puck"
-        case League.epl.id: "soccerball"
+        case League.epl.id, League.ucl.id, League.mls.id: "soccerball"
         default: "sportscourt"
         }
     }
 }
 
-extension League {
-    /// ESPN's league logo, for section headers.
-    var logoURL: URL? {
-        URL(string: id == League.epl.id
-            ? "https://a.espncdn.com/i/leaguelogos/soccer/500/23.png"
-            : "https://a.espncdn.com/i/teamlogos/leagues/500/\(id).png")
-    }
-}
 
 struct LeagueLogo: View {
     let league: League

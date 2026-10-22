@@ -808,7 +808,7 @@ private struct DrivesDTO: Decodable {
         /// ESPN marks plays without a spot with huge negative sentinels, which fall outside these ranges.
         func location(league: League.ID?) -> Play.Location? {
             switch league {
-            case League.epl.id:                                                       // 0–100 toward goal
+            case League.epl.id, League.ucl.id, League.mls.id:                         // 0–100 toward goal
                 guard let x = fieldPositionX, let y = fieldPositionY else { return nil }
                 return .init(x: x / 100, y: y / 100)
             case League.mlb.id:                                                       // 250-unit hit chart
