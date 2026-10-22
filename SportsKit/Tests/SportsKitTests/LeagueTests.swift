@@ -27,17 +27,14 @@ struct LeagueFixture: Sendable, CustomTestStringConvertible {
 private let fixtures: [LeagueFixture] = [
     .init(league: .nba, games: 12, gameID: "401898406", status: .final, home: ("ORL", 136), away: ("MIA", 115),
           compactPeriod: "Q4", plays: 515, scoringPlays: 131, teamStats: 25, boxScores: 2),
+    .init(league: .wnba, games: 1, gameID: "401918307", status: .final, home: ("ATL", 97), away: ("GS", 71),
+          compactPeriod: "Q4", plays: 426, scoringPlays: 89, teamStats: 25, boxScores: 2),
     .init(league: .mlb, games: 1, gameID: "401908028", status: .live, home: ("TB", 5), away: ("CLE", 3),
           compactPeriod: "Top 8th", plays: 490, scoringPlays: 6, teamStats: 0, boxScores: 4),
     .init(league: .nhl, games: 4, gameID: "401892535", status: .final, home: ("NYR", 5), away: ("ANA", 2),
           compactPeriod: "P3", plays: 311, scoringPlays: 7, teamStats: 14, boxScores: 8),
     .init(league: .epl, games: 1, gameID: "401879257", status: .final, home: ("TOT", 3), away: ("COV", 1),
           compactPeriod: "FT", plays: 34, scoringPlays: 4, teamStats: 28, boxScores: 0),
-    .init(league: .afl, games: 1, gameID: "1133711", status: .final, home: ("FRE", 89), away: ("BL", 96),
-          compactPeriod: "Q4", plays: 55, scoringPlays: 55, teamStats: 28, boxScores: 2),
-    // ESPN sends NRL scores but no plays, box score or flat team stats.
-    .init(league: .nrl, games: 1, gameID: "604845", status: .final, home: ("SYD", 19), away: ("NEW", 18),
-          compactPeriod: "Final", plays: 0, scoringPlays: 0, teamStats: 0, boxScores: 0),
 ]
 
 @Suite struct LeagueFixtureTests {
@@ -86,7 +83,7 @@ private let fixtures: [LeagueFixture] = [
         #expect(League.nhl.periodTitle(4) == "Overtime")
         #expect(League.mlb.periodTitle(7) == "Inning 7")
         #expect(League.epl.periodTitle(1) == "First Half")
-        #expect(League.nrl.periodTitle(2) == "Second Half")
+        #expect(League.epl.periodTitle(2) == "Second Half")
     }
 
     @Test func alertsOnlyWhereTheyMakeSense() {
@@ -96,7 +93,7 @@ private let fixtures: [LeagueFixture] = [
         #expect(NotificationEvent.halftime.applies(to: .epl))
         #expect(!NotificationEvent.halftime.applies(to: .nhl))
         #expect(NotificationEvent.closeGame.applies(to: .nba))
-        #expect(!NotificationEvent.closeGame.applies(to: .afl))
+        #expect(!NotificationEvent.closeGame.applies(to: .epl))
         #expect(!NotificationEvent.redZone.applies(to: .nba))
     }
 }

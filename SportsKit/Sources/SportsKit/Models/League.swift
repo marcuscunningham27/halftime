@@ -62,15 +62,16 @@ public struct League: Identifiable, Hashable, Sendable {
                                    closeGameMargin: 8, closeGameSeconds: 300)
     public static let nba = League(id: "nba", name: "National Basketball Association", abbreviation: "NBA",
                                    closeGameMargin: 5, closeGameSeconds: 120)
+    public static let wnba = League(id: "wnba", name: "Women's National Basketball Association", abbreviation: "WNBA",
+                                    closeGameMargin: 5, closeGameSeconds: 120)
     public static let mlb = League(id: "mlb", name: "Major League Baseball", abbreviation: "MLB", periodStyle: .innings)
     public static let nhl = League(id: "nhl", name: "National Hockey League", abbreviation: "NHL", periodStyle: .periods,
                                    closeGameMargin: 1, closeGameSeconds: 300)
     public static let epl = League(id: "epl", name: "Premier League", abbreviation: "EPL", periodStyle: .halves)
-    public static let afl = League(id: "afl", name: "Australian Football League", abbreviation: "AFL")
-    public static let nrl = League(id: "nrl", name: "National Rugby League", abbreviation: "NRL", periodStyle: .halves)
 
     /// Every league the app knows about, in sidebar order; providers say which ones they can serve.
-    public static let all: [League] = [.nfl, .nba, .mlb, .nhl, .epl, .afl, .nrl]
+    /// AFL and NRL were dropped (Oct 2026): ESPN's data for them is too thin. Follows of theirs are pruned on launch.
+    public static let all: [League] = [.nfl, .nba, .wnba, .mlb, .nhl, .epl]
 
     public static func with(id: League.ID) -> League? {
         all.first { $0.id == id }

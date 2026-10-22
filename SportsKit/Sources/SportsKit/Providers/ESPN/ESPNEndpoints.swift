@@ -8,11 +8,10 @@ enum ESPNEndpoints {
     static let leaguePaths: [League.ID: String] = [
         League.nfl.id: "football/nfl",
         League.nba.id: "basketball/nba",
+        League.wnba.id: "basketball/wnba",
         League.mlb.id: "baseball/mlb",
         League.nhl.id: "hockey/nhl",
         League.epl.id: "soccer/eng.1",
-        League.afl.id: "australian-football/afl",
-        League.nrl.id: "rugby-league/3",
     ]
 
     /// nil asks for ESPN's "current" slate: this week for NFL, the latest round for off-season leagues.
@@ -48,6 +47,8 @@ enum ESPNEndpoints {
                              rankBy: ["winPercent", "wins"]),
         League.nba.id: .init(level: nil, columns: [("wins", "W"), ("losses", "L"), ("winPercent", "PCT"), ("gamesBehind", "GB")],
                              rankBy: ["winPercent", "wins"]),
+        League.wnba.id: .init(level: nil, columns: [("wins", "W"), ("losses", "L"), ("winPercent", "PCT"), ("gamesBehind", "GB")],
+                              rankBy: ["winPercent", "wins"]),
         League.mlb.id: .init(level: 3, columns: [("wins", "W"), ("losses", "L"), ("winPercent", "PCT"), ("gamesBehind", "GB")],
                              rankBy: ["winPercent", "wins"]),
         League.nhl.id: .init(level: 3, columns: [("gamesPlayed", "GP"), ("wins", "W"), ("losses", "L"), ("otLosses", "OTL"), ("points", "PTS")],
@@ -55,12 +56,6 @@ enum ESPNEndpoints {
         League.epl.id: .init(level: nil, columns: [("gamesPlayed", "GP"), ("wins", "W"), ("ties", "D"), ("losses", "L"),
                                                     ("pointDifferential", "GD"), ("points", "PTS")],
                              rankBy: ["points", "pointDifferential", "pointsFor"]),
-        League.afl.id: .init(level: nil, columns: [("gamesPlayed", "P"), ("wins", "W"), ("losses", "L"), ("ties", "D"),
-                                                    ("percentage", "%"), ("points", "PTS")],
-                             rankBy: ["points", "percentage"]),
-        League.nrl.id: .init(level: nil, columns: [("gamesPlayed", "P"), ("gamesWon", "W"), ("gamesLost", "L"), ("gamesDrawn", "D"),
-                                                    ("pointsDifference", "PD"), ("points", "PTS")],
-                             rankBy: ["points", "pointsDifference"]),
     ]
 
     /// ESPN's core API, where "football/nfl" is written "football/leagues/nfl".
@@ -85,7 +80,7 @@ enum ESPNEndpoints {
     }
 
     /// ESPN buckets games by US Eastern calendar day, so a local day can straddle two ESPN days.
-    /// Fetching both and filtering by start time also covers leagues bucketed by their own local day (AFL, NRL).
+    /// Fetching both and filtering by start time also covers leagues bucketed by their own local day.
     static func espnDays(covering day: DateInterval) -> [String] {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "America/New_York")!

@@ -149,7 +149,7 @@ public actor ESPNProvider: SportsProvider {
     public func gameDetail(for game: Game) async throws -> GameDetail {
         let path = try Self.path(for: game.leagueID)
         var detail = try Self.parseSummary(try await fetch(ESPNEndpoints.summary(path: path, gameID: game.id)), leagueID: game.leagueID)
-        if [League.nba.id, League.nfl.id, League.nhl.id].contains(game.leagueID), game.status == .live {
+        if [League.nba.id, League.wnba.id, League.nfl.id, League.nhl.id].contains(game.leagueID), game.status == .live {
             // Optional extra: the court still draws without timeouts and fouls.
             detail.court = try? Self.parseCourtSituation(try await fetch(ESPNEndpoints.situation(path: path, gameID: game.id)))
         }
@@ -214,7 +214,7 @@ public actor ESPNProvider: SportsProvider {
         if !drives.isEmpty {
             plays = modelDrives.flatMap(\.plays)
         } else {
-            // Some feeds (AFL) leave scoringPlay empty, so fall back to the running score changing.
+            // Some feeds leave scoringPlay empty, so fall back to the running score changing.
             var previous: (Int?, Int?) = (0, 0)
             var lastPitch: DrivesDTO.PlayDTO?
             plays = (summary.plays ?? summary.keyEvents ?? []).map { dto in
@@ -757,7 +757,7 @@ private struct DrivesDTO: Decodable {
             case League.nhl.id:                                                       // feet from centre ice
                 guard let x = coordinate?.x, let y = coordinate?.y, (-100...100).contains(x), (-42.5...42.5).contains(y) else { return nil }
                 return .init(x: (x + 100) / 200, y: (42.5 - y) / 85)
-            case League.nba.id:                                                       // feet, half court
+            case League.nba.id, League.wnba.id:                                       // feet, half court
                 guard let x = coordinate?.x, let y = coordinate?.y, (0...50).contains(x), (0...47).contains(y) else { return nil }
                 return .init(x: x / 50, y: y / 47)
             default:

@@ -78,11 +78,11 @@ struct MyTeamsProvider: TimelineProvider {
 // MARK: - League
 
 enum LeagueOption: String, AppEnum {
-    case nfl, nba, mlb, nhl, epl, afl, nrl
+    case nfl, nba, wnba, mlb, nhl, epl
 
     static let typeDisplayRepresentation: TypeDisplayRepresentation = "League"
     static let caseDisplayRepresentations: [LeagueOption: DisplayRepresentation] = [
-        .nfl: "NFL", .nba: "NBA", .mlb: "MLB", .nhl: "NHL", .epl: "Premier League", .afl: "AFL", .nrl: "NRL",
+        .nfl: "NFL", .nba: "NBA", .wnba: "WNBA", .mlb: "MLB", .nhl: "NHL", .epl: "Premier League",
     ]
 
     var league: League { League.with(id: rawValue) ?? .nfl }

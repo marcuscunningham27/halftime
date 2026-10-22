@@ -133,7 +133,7 @@ struct GameHeader: View {
         }
     }
 
-    private var lineScoreInHeader: Bool { [League.nba.id, League.nfl.id, League.nhl.id, League.mlb.id].contains(game.leagueID) && game.status != .scheduled }
+    private var lineScoreInHeader: Bool { [League.nba.id, League.wnba.id, League.nfl.id, League.nhl.id, League.mlb.id].contains(game.leagueID) && game.status != .scheduled }
 
     private enum Direction { case left, right }
 

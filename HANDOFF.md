@@ -14,7 +14,7 @@ then reported back.
 
 All 8 phases of the spec are done, plus a lot of extra design work.
 
-- **Scores:** ESPN's unofficial site API covers NFL, NBA, MLB, NHL, EPL, AFL and NRL. There's a Home tab
+- **Scores:** ESPN's unofficial site API covers NFL, NBA, WNBA, MLB, NHL and EPL (WNBA reuses all the NBA code; AFL and NRL were dropped in Oct 2026: ESPN's data for them was too thin). There's a Home tab
   (Yesterday/Today/Upcoming, My Teams first), and league and team pages with the same picker, recent
   results and standings.
 - **Where to watch:** score cards (Home, league pages) show a glass pill under the status with up to two
@@ -125,7 +125,7 @@ Tests: 132 passing in SportsKit.
   Run `pkill -x Halftime` first, or `open` just brings the old build forward.
 - Run tests outside ~/Documents (codesign fails on extended attributes):
   `cd SportsKit && swift test --scratch-path <scratchpad>/skbuild`.
-- Widgets: bump `CURRENT_PROJECT_VERSION` (currently 31) and run `lsregister -f` on the app whenever widget
+- Widgets: bump `CURRENT_PROJECT_VERSION` (currently 33) and run `lsregister -f` on the app whenever widget
   code **or SportsKit** changes (the widget links SportsKit). Otherwise widgets draw grey placeholders and
   chronod logs "Bundle version did not match". `killall chronod` makes them reload straight away.
 - The user checks things visually. Check changes in the running app (the computer-use tools work; macOS

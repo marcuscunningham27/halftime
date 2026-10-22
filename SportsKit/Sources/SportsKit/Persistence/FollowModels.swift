@@ -170,6 +170,15 @@ extension ModelContext {
         return true
     }
 
+    /// Drops follows and overrides for leagues the app no longer carries (AFL and NRL), so they leave the sidebar.
+    public func pruneRetiredLeagues() throws {
+        let known = League.all.map(\.id)
+        let teams = try fetch(FetchDescriptor<FollowedTeam>(predicate: #Predicate { !known.contains($0.leagueID) }))
+        for team in teams { try unfollow(Follows.TeamRef(leagueID: team.leagueID, teamID: team.teamID)) }
+        let leagues = try fetch(FetchDescriptor<FollowedLeague>(predicate: #Predicate { !known.contains($0.leagueID) }))
+        for league in leagues { try unfollow(leagueID: league.leagueID) }
+    }
+
     public func pruneNotificationLog(olderThan date: Date) throws {
         try delete(model: NotificationLog.self, where: #Predicate { $0.firedAt < date })
         try save()

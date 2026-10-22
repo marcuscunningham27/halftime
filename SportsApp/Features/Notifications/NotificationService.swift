@@ -26,6 +26,7 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
         super.init()
         UNUserNotificationCenter.current().delegate = self
         try? context.pruneNotificationLog(olderThan: .now.addingTimeInterval(-7 * 24 * 3600))
+        try? context.pruneRetiredLeagues()
         // Covers follows made before notifications existed; a no-op once the user has answered.
         if (try? context.fetchCount(FetchDescriptor<FollowedTeam>())) ?? 0 > 0
             || (try? context.fetchCount(FetchDescriptor<FollowedLeague>())) ?? 0 > 0 {

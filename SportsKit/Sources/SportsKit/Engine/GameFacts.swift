@@ -9,7 +9,7 @@ public enum GameFacts {
         if let leaders = topPerformers(game: game, detail: detail) { sentences.append(leaders) }
         if game.status == .live {
             let runs = scoringRuns(game: game, detail: detail)
-            if game.leagueID == League.nba.id, let run = runs.last, run.points >= 6 {
+            if [League.nba.id, League.wnba.id].contains(game.leagueID), let run = runs.last, run.points >= 6 {
                 sentences.append("\(name(run.team, in: game)) are on a \(run.points)–0 run.")
             } else if let last = detail.plays.last(where: \.isScoring) {
                 sentences.append("Latest score: \(last.text) (\(when(last, in: game))).")
@@ -319,7 +319,7 @@ public struct QuickQuestion: Hashable, Sendable, Identifiable {
             .init("How did turnovers change the game?", .teamStats(["Turnovers", "Fumbles lost", "Interceptions thrown"])),
             .init("What were the key scoring drives?", .scoringDrives),
         ]
-        case League.nba.id: [
+        case League.nba.id, League.wnba.id: [
             .init("Who's the top scorer?", .leaders(["points"])),
             .init("How are the teams shooting from three?", .teamStats(["3PT", "Three Point %"])),
             .init("Who leads in rebounds and assists?", .leaders(["rebounds", "assists"])),
@@ -342,18 +342,6 @@ public struct QuickQuestion: Hashable, Sendable, Identifiable {
             .init("Which team had more of the ball?", .teamStats(["Possession", "Passes"])),
             .init("Who were the standout players?", .model),
             .init("What were the big chances?", .teamStats(["SHOTS", "ON GOAL", "Corner Kicks"])),
-        ]
-        case League.afl.id: [
-            .init("Who kicked the most goals?", .leaders(["goals"])),
-            .init("Who had the most disposals?", .leaders(["disposals"])),
-            .init("Which quarter swung it?", .decidingPeriod),
-            .init("Who won the clearances?", .teamStats(["Total Clearances", "Centre Clearances", "Stoppage Clearances"])),
-        ]
-        case League.nrl.id: [
-            .init("Who scored the tries?", .scoring),
-            .init("Which team won the territory battle?", .model),
-            .init("What were the turning points?", .model),
-            .init("Who were the best players?", .leaders([])),
         ]
         default: [
             .init("Who were the best players?", .leaders([])),

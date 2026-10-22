@@ -63,8 +63,14 @@ struct GamecastView<Surface: View>: View {
         .animation(.snappy, value: latest?.id)
     }
 
-    /// NFL teams get three timeouts a half, NBA teams seven a game.
-    private var timeoutsPerGame: Int { game.leagueID == League.nfl.id ? 3 : 7 }
+    /// NFL teams get three timeouts a half, NBA teams seven a game, WNBA teams five.
+    private var timeoutsPerGame: Int {
+        switch game.leagueID {
+        case League.nfl.id: 3
+        case League.wnba.id: 5
+        default: 7
+        }
+    }
 }
 
 /// The play's team. Football files timeouts under the drive's team, so read "Timeout #1 by SF" instead.

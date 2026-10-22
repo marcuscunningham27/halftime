@@ -23,7 +23,7 @@ struct PlaySurfaceView: View {
                 }
                 .frame(maxWidth: 600)
             }
-        case League.nba.id:
+        case League.nba.id, League.wnba.id:
             if game.status == .live || !shots.isEmpty {
                 GamecastView(game: game, plays: detail?.plays ?? [], court: detail?.court) {
                     BasketballCourtView(game: game, shots: shots, possession: game.status == .live

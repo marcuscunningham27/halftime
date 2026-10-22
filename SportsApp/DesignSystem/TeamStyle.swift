@@ -5,12 +5,10 @@ extension League {
     var symbolName: String {
         switch id {
         case League.nfl.id: "football"
-        case League.nba.id: "basketball"
+        case League.nba.id, League.wnba.id: "basketball"
         case League.mlb.id: "baseball"
         case League.nhl.id: "hockey.puck"
         case League.epl.id: "soccerball"
-        case League.afl.id: "australian.football"
-        case League.nrl.id: "rugbyball"
         default: "sportscourt"
         }
     }

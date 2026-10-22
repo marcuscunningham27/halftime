@@ -71,6 +71,18 @@ private func game(league: League.ID, home: String, away: String) -> Game {
         try context.save()
         #expect(try context.fetchCount(FetchDescriptor<FollowedTeam>()) == 1)
     }
+
+    @Test func droppedLeaguesArePruned() throws {
+        let context = try makeContext()
+        context.insert(FollowedLeague(leagueID: "nrl"))
+        context.insert(FollowedLeague(leagueID: "nba"))
+        context.insert(FollowedTeam(team: team("7"), leagueID: "afl"))
+        context.insert(FollowedTeam(team: team("12"), leagueID: "nfl"))
+        try context.save()
+        try context.pruneRetiredLeagues()
+        #expect(try context.fetch(FetchDescriptor<FollowedLeague>()).map(\.leagueID) == ["nba"])
+        #expect(try context.fetch(FetchDescriptor<FollowedTeam>()).map(\.leagueID) == ["nfl"])
+    }
 }
 
 private extension Team {
