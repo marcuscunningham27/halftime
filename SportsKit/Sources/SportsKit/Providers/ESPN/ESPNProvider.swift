@@ -520,6 +520,30 @@ private struct SummaryDTO: Decodable {
     let predictor: PredictorDTO?
     let standings: SummaryStandingsDTO?
     let leaders: [TeamLeadersDTO]?
+    let article: ArticleDTO?
+
+    struct ArticleDTO: Decodable {
+        struct Links: Decodable { struct Link: Decodable { let href: URL? }; let web: Link? }
+        let headline: String?
+        let story: String?
+        let links: Links?
+
+        /// The story's HTML as plain paragraphs: tags dropped, common entities decoded, blank lines removed.
+        var recap: GameOverview.Recap? {
+            guard let headline, let story, !story.isEmpty else { return nil }
+            let text = story
+                .replacingOccurrences(of: "</p>", with: "\n", options: .caseInsensitive)
+                .replacingOccurrences(of: "<br\\s*/?>", with: "\n", options: [.regularExpression, .caseInsensitive])
+                .replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+            let entities = ["&amp;": "&", "&quot;": "\"", "&#39;": "'", "&apos;": "'", "&nbsp;": " ", "&lt;": "<", "&gt;": ">",
+                            "&rsquo;": "\u{2019}", "&lsquo;": "\u{2018}", "&ldquo;": "\u{201C}", "&rdquo;": "\u{201D}", "&mdash;": "\u{2014}"]
+            let decoded = entities.reduce(text) { $0.replacingOccurrences(of: $1.key, with: $1.value) }
+            // ESPN's datelines read "ORLANDO, Fla. -- — Nickeil…"; keep one dash.
+            let paragraphs = decoded.replacingOccurrences(of: "-- \u{2014}", with: "\u{2014}").components(separatedBy: .newlines)
+                .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+            return paragraphs.isEmpty ? nil : .init(headline: headline, paragraphs: paragraphs, url: links?.web?.href)
+        }
+    }
 
     struct GameInfoDTO: Decodable {
         struct VenueDTO: Decodable {
@@ -645,7 +669,7 @@ private struct SummaryDTO: Decodable {
             venue: venue, attendance: gameInfo?.attendance.flatMap { $0 > 0 ? $0 : nil },
             broadcasts: Array(NSOrderedSet(array: (header?.competitions?.first?.broadcasts ?? []).compactMap { $0.media?.shortName }))
                 .compactMap { $0 as? String },
-            odds: odds, standings: standings, winProbability: probability, leaders: leaders)
+            odds: odds, standings: standings, winProbability: probability, leaders: leaders, recap: article?.recap)
     }
 }
 

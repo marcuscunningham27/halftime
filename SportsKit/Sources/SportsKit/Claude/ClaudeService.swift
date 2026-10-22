@@ -125,8 +125,8 @@ public enum GamePrompt {
     """
 
     /// The recap data plus the top rows of each box score, then the question.
-    public static func ask(_ question: String, game: Game, detail: GameDetail) -> String {
-        var lines = [recap(game: game, detail: detail)]
+    public static func ask(_ question: String, game: Game, detail: GameDetail, compact: Bool = false) -> String {
+        var lines = [recap(game: game, detail: detail, compact: compact)]
         if !detail.boxScores.isEmpty {
             lines.append("\nBox score (top 3 per category):")
             for box in detail.boxScores {
@@ -144,7 +144,9 @@ public enum GamePrompt {
         game.status == .live ? catchUpSystem : recapSystem
     }
 
-    public static func recap(game: Game, detail: GameDetail) -> String {
+    /// `compact` trims the play lists to the latest ones so the prompt fits the on-device model's small
+    /// context (about 4,000 tokens); a full NBA game has around 90 scoring plays.
+    public static func recap(game: Game, detail: GameDetail, compact: Bool = false) -> String {
         let away = game.away, home = game.home
         func name(_ id: Team.ID?) -> String {
             id == home.team.id ? home.team.shortName : id == away.team.id ? away.team.shortName : ""
@@ -177,15 +179,16 @@ public enum GamePrompt {
         let records = [away, home].compactMap { c in c.record.map { "\(c.team.shortName) \($0)" } }
         if !records.isEmpty { lines.append("Records: " + records.joined(separator: ", ")) }
 
-        let scoring = detail.plays.filter(\.isScoring)
+        let allScoring = detail.plays.filter(\.isScoring)
+        let scoring = compact ? Array(allScoring.suffix(10)) : allScoring
         if !scoring.isEmpty {
-            lines.append("\nScoring plays:")
+            lines.append(scoring.count < allScoring.count ? "\nLatest \(scoring.count) scoring plays:" : "\nScoring plays:")
             lines += scoring.map { play in
                 let score = play.awayScore.flatMap { a in play.homeScore.map { " [\(a)–\($0)]" } } ?? ""
                 return "- P\(play.period) \(play.clock) \(name(play.teamID)): \(play.text)\(score)"
             }
         }
-        if game.status == .live, let last = detail.plays.suffix(8).nilIfEmpty {
+        if game.status == .live, let last = detail.plays.suffix(compact ? 5 : 8).nilIfEmpty {
             lines.append("\nLatest plays:")
             lines += last.map { "- P\($0.period) \($0.clock): \($0.text)" }
         }

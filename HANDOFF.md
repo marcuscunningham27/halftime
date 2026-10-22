@@ -46,8 +46,17 @@ All 8 phases of the spec are done, plus a lot of extra design work.
     - MLB diamond, NHL rink and soccer pitch.
   - A line score, then Overview, Stats, Play-By-Play and Box Score tabs.
   - Win and cover probability charts with hover values.
-  - A Recap or Catch Me Up card, and an Ask About the Game box with one-click questions per sport
-    (`AskCard.suggestions(for:)`, four per league; the first is also the field's placeholder).
+  - Recap / Catch Me Up card with no AI needed: finished games show ESPN's written story
+    (`GameOverview.recap`, parsed from the summary's `article`); live games, and finals without a story, show
+    `GameFacts.summary` (score, top performers, NBA runs or the latest score, NFL/MLB situation, deciding
+    period). "Summarise with Claude/AI" rewrites it with the chosen engine when that engine can run.
+  - Ask About the Game: four one-click `QuickQuestion`s per league (SportsKit), answered from the stats by
+    `GameFacts.answer` (leaders, team stats, scoring plays, runs, drives, box rows); `.model` questions and typed
+    questions go to the AI engine, except typed questions `GameFacts.answer(typed:)` can answer from the stats:
+    a named player ("how many rebounds does Booker have?", matched on surname, reads their box score row) or a
+    leader category ("most points"). The on-device model gets `compact` prompts (latest 10
+    scoring plays) because a full NBA game overflowed its ~4,000-token context; it still invents players now and then. The typed box only shows when an engine is available. The user found the
+    on-device model too error-prone for free-written summaries, hence this.
 - **Widgets:** My Teams (each team's live game, else a result from the last 36 h, else its next game;
   rows ordered live, results, upcoming) and League, with an App Group for shared data and Chakra Petch scores.
 - **AI** (Settings › Summaries): pick On-Device (Apple Foundation Models, the default) or Claude
@@ -67,7 +76,7 @@ All 8 phases of the spec are done, plus a lot of extra design work.
     - A Bye Weeks card with traffic lights (Clear, Covered, Hole) and Who's Missing and Covered By columns.
     - An injury report and the latest news (ESPN/Rotowire, clickable).
 
-Tests: 124 passing in SportsKit.
+Tests: 132 passing in SportsKit.
 
 ## Name and icon
 
@@ -116,7 +125,7 @@ Tests: 124 passing in SportsKit.
   Run `pkill -x Halftime` first, or `open` just brings the old build forward.
 - Run tests outside ~/Documents (codesign fails on extended attributes):
   `cd SportsKit && swift test --scratch-path <scratchpad>/skbuild`.
-- Widgets: bump `CURRENT_PROJECT_VERSION` (currently 26) and run `lsregister -f` on the app whenever widget
+- Widgets: bump `CURRENT_PROJECT_VERSION` (currently 31) and run `lsregister -f` on the app whenever widget
   code **or SportsKit** changes (the widget links SportsKit). Otherwise widgets draw grey placeholders and
   chronod logs "Bundle version did not match". `killall chronod` makes them reload straight away.
 - The user checks things visually. Check changes in the running app (the computer-use tools work; macOS

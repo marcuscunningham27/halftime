@@ -98,9 +98,25 @@ public struct GameOverview: Hashable, Sendable {
     /// Pre-game win chance (0–100) by team ID.
     public let winProbability: [Team.ID: Double]
     public let leaders: [Leader]
+    /// ESPN's written game story, once a finished game has one.
+    public let recap: Recap?
+
+    /// A published game story: headline, body paragraphs and a link to the full article.
+    public struct Recap: Hashable, Sendable {
+        public let headline: String
+        public let paragraphs: [String]
+        public let url: URL?
+
+        public init(headline: String, paragraphs: [String], url: URL?) {
+            self.headline = headline
+            self.paragraphs = paragraphs
+            self.url = url
+        }
+    }
 
     public init(venue: Venue? = nil, attendance: Int? = nil, broadcasts: [String] = [], odds: Odds? = nil,
-                standings: [Standing] = [], winProbability: [Team.ID: Double] = [:], leaders: [Leader] = []) {
+                standings: [Standing] = [], winProbability: [Team.ID: Double] = [:], leaders: [Leader] = [],
+                recap: Recap? = nil) {
         self.venue = venue
         self.attendance = attendance
         self.broadcasts = broadcasts
@@ -108,6 +124,7 @@ public struct GameOverview: Hashable, Sendable {
         self.standings = standings
         self.winProbability = winProbability
         self.leaders = leaders
+        self.recap = recap
     }
 }
 

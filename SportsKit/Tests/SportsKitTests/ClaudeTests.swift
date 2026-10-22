@@ -88,3 +88,16 @@ private func fixture(_ name: String) throws -> Data {
         #expect(GamePrompt.latestScoringPlay(in: detail, matching: game)?.id == "it")
     }
 }
+
+@Test func compactPromptKeepsOnlyTheLatestScoringPlays() {
+    let team = Team(id: "1", abbreviation: "A", displayName: "A Team", shortName: "A", colorHex: nil, alternateColorHex: nil, logoURL: nil)
+    let other = Team(id: "2", abbreviation: "B", displayName: "B Team", shortName: "B", colorHex: nil, alternateColorHex: nil, logoURL: nil)
+    let game = Game(id: "g", leagueID: League.nba.id, startDate: .now, status: .final, period: 4, clock: "0:00", statusDetail: "Final",
+                    home: .init(team: other, score: 0, periodScores: []), away: .init(team: team, score: 60, periodScores: []))
+    let plays = (1...30).map { Play(id: "\($0)", text: "basket \($0)", period: 4, clock: "", teamID: "1", isScoring: true,
+                                    awayScore: $0 * 2, homeScore: 0) }
+    let detail = GameDetail(plays: plays, boxScores: [], teamStats: [])
+    let compact = GamePrompt.recap(game: game, detail: detail, compact: true)
+    #expect(compact.contains("Latest 10 scoring plays:") && compact.contains("basket 30") && !compact.contains("basket 20]"))
+    #expect(!compact.contains("basket 20 ") && GamePrompt.recap(game: game, detail: detail).contains("basket 1 "))
+}

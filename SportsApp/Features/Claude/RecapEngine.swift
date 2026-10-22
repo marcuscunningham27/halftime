@@ -51,12 +51,12 @@ enum RecapEngine: String, CaseIterable, Identifiable {
     }
 
     @MainActor func recap(game: Game, detail: GameDetail) async throws -> String {
-        try await complete(system: GamePrompt.system(for: game), user: GamePrompt.recap(game: game, detail: detail))
+        try await complete(system: GamePrompt.system(for: game), user: GamePrompt.recap(game: game, detail: detail, compact: self == .onDevice))
     }
 
     /// An answer to a fan's question, from this game's data only.
     @MainActor func answer(_ question: String, game: Game, detail: GameDetail) async throws -> String {
-        try await complete(system: GamePrompt.askSystem, user: GamePrompt.ask(question, game: game, detail: detail))
+        try await complete(system: GamePrompt.askSystem, user: GamePrompt.ask(question, game: game, detail: detail, compact: self == .onDevice))
     }
 
     /// A briefing on your fantasy week: matchup, lineup gaps and injuries, and news that matters.
