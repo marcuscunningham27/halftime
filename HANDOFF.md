@@ -125,7 +125,7 @@ Tests: 132 passing in SportsKit.
   Run `pkill -x Halftime` first, or `open` just brings the old build forward.
 - Run tests outside ~/Documents (codesign fails on extended attributes):
   `cd SportsKit && swift test --scratch-path <scratchpad>/skbuild`.
-- Widgets: bump `CURRENT_PROJECT_VERSION` (currently 33) and run `lsregister -f` on the app whenever widget
+- Widgets: bump `CURRENT_PROJECT_VERSION` (currently 35) and run `lsregister -f` on the app whenever widget
   code **or SportsKit** changes (the widget links SportsKit). Otherwise widgets draw grey placeholders and
   chronod logs "Bundle version did not match". `killall chronod` makes them reload straight away.
 - The user checks things visually. Check changes in the running app (the computer-use tools work; macOS

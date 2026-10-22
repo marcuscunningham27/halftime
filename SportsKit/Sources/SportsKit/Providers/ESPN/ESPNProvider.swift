@@ -232,7 +232,7 @@ public actor ESPNProvider: SportsProvider {
             }
         }
 
-        let boxScores = (summary.boxscore?.players ?? []).flatMap { team in
+        var boxScores = (summary.boxscore?.players ?? []).flatMap { team in
             team.statistics.enumerated().compactMap { index, category -> BoxScore? in
                 guard let labels = category.labels, !labels.isEmpty else { return nil }
                 return BoxScore(teamID: team.team.id, category: category.name ?? "players-\(index)",
@@ -244,14 +244,19 @@ public actor ESPNProvider: SportsProvider {
             }
         }
 
+        // Soccer has no player tables in the box score; the line-ups carry each player's stats instead.
+        if boxScores.isEmpty, let rosters = summary.rosters {
+            boxScores = rosters.compactMap(\.boxScore)
+        }
+
         let teams = summary.boxscore?.teams ?? []
         var teamStats: [TeamStat] = []
         if let away = teams.first(where: { $0.homeAway == "away" }),
            let home = teams.first(where: { $0.homeAway == "home" }) {
             // Both teams list the same stats in the same order.
-            // Stats without a label and value (MLB nests batting/pitching groups) are left out.
-            teamStats = zip(away.statistics, home.statistics).enumerated().compactMap { index, pair in
-                guard let label = pair.0.label, let awayValue = pair.0.displayValue, let homeValue = pair.1.displayValue else { return nil }
+            teamStats = zip(away.flatStatistics, home.flatStatistics).enumerated().compactMap { index, pair in
+                guard let label = pair.0.label ?? pair.0.displayName, let awayValue = pair.0.displayValue,
+                      let homeValue = pair.1.displayValue else { return nil }
                 return TeamStat(id: index, label: label, away: awayValue, home: homeValue)
             }
         }
@@ -510,6 +515,7 @@ private struct TeamRefDTO: Decodable {
 
 private struct SummaryDTO: Decodable {
     let boxscore: BoxscoreDTO?
+    let rosters: [RosterDTO]?
     let drives: DrivesDTO?
     let plays: [DrivesDTO.PlayDTO]?
     let keyEvents: [DrivesDTO.PlayDTO]?
@@ -676,12 +682,30 @@ private struct SummaryDTO: Decodable {
 private struct BoxscoreDTO: Decodable {
     struct TeamStatsDTO: Decodable {
         struct StatDTO: Decodable {
+            let name: String?
             let label: String?
+            let displayName: String?
             let displayValue: String?
+            /// MLB nests its stats in batting, pitching and fielding groups.
+            let stats: [StatDTO]?
         }
+
+        /// The few of MLB's 170 grouped stats that a box score shows, in display order.
+        static let mlbStats = [
+            "batting": ["hits", "runs", "homeRuns", "RBIs", "walks", "strikeouts", "runnersLeftOnBase", "avg"],
+            "pitching": ["pitches", "strikes", "earnedRuns"],
+            "fielding": ["errors", "doublePlays"],
+        ]
 
         let homeAway: String
         let statistics: [StatDTO]
+
+        var flatStatistics: [StatDTO] {
+            statistics.flatMap { group -> [StatDTO] in
+                guard let stats = group.stats else { return [group] }
+                return (Self.mlbStats[group.name ?? ""] ?? []).compactMap { name in stats.first { $0.name == name } }
+            }
+        }
     }
 
     struct PlayersDTO: Decodable {
@@ -708,6 +732,42 @@ private struct BoxscoreDTO: Decodable {
 
     let teams: [TeamStatsDTO]?
     let players: [PlayersDTO]?
+}
+
+/// A soccer line-up, with each player's match stats.
+private struct RosterDTO: Decodable {
+    struct PlayerDTO: Decodable {
+        struct AthleteDTO: Decodable { let id: String; let displayName: String }
+        struct PositionDTO: Decodable { let abbreviation: String? }
+        struct StatDTO: Decodable { let abbreviation: String?; let displayValue: String? }
+
+        let starter: Bool?
+        let subbedIn: Bool?
+        let athlete: AthleteDTO
+        let position: PositionDTO?
+        let stats: [StatDTO]?
+    }
+
+    struct TeamDTO: Decodable { let id: String; let displayName: String? }
+
+    static let columns = ["G", "A", "SHOT", "SOG", "FC", "FA", "YC", "RC"]
+
+    let team: TeamDTO
+    let roster: [PlayerDTO]?
+
+    /// Starters, then the subs who came on; unused subs are left out.
+    var boxScore: BoxScore? {
+        let played = (roster ?? []).filter { $0.starter == true } + (roster ?? []).filter { $0.starter != true && $0.subbedIn == true }
+        guard !played.isEmpty else { return nil }
+        return BoxScore(teamID: team.id, category: "players", title: "\(team.displayName ?? "") Players",
+                        labels: ["POS"] + Self.columns,
+                        rows: played.map { player in
+                            let stats = Dictionary((player.stats ?? []).compactMap { s in s.abbreviation.map { ($0, s.displayValue ?? "") } },
+                                                   uniquingKeysWith: { first, _ in first })
+                            return .init(id: player.athlete.id, name: player.athlete.displayName,
+                                         stats: [player.position?.abbreviation ?? ""] + Self.columns.map { stats[$0] ?? "0" })
+                        })
+    }
 }
 
 private struct DrivesDTO: Decodable {

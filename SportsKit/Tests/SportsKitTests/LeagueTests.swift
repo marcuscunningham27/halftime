@@ -30,11 +30,11 @@ private let fixtures: [LeagueFixture] = [
     .init(league: .wnba, games: 1, gameID: "401918307", status: .final, home: ("ATL", 97), away: ("GS", 71),
           compactPeriod: "Q4", plays: 426, scoringPlays: 89, teamStats: 25, boxScores: 2),
     .init(league: .mlb, games: 1, gameID: "401908028", status: .live, home: ("TB", 5), away: ("CLE", 3),
-          compactPeriod: "Top 8th", plays: 490, scoringPlays: 6, teamStats: 0, boxScores: 4),
+          compactPeriod: "Top 8th", plays: 490, scoringPlays: 6, teamStats: 13, boxScores: 4),
     .init(league: .nhl, games: 4, gameID: "401892535", status: .final, home: ("NYR", 5), away: ("ANA", 2),
           compactPeriod: "P3", plays: 311, scoringPlays: 7, teamStats: 14, boxScores: 8),
     .init(league: .epl, games: 1, gameID: "401879257", status: .final, home: ("TOT", 3), away: ("COV", 1),
-          compactPeriod: "FT", plays: 34, scoringPlays: 4, teamStats: 28, boxScores: 0),
+          compactPeriod: "FT", plays: 34, scoringPlays: 4, teamStats: 28, boxScores: 2),
 ]
 
 @Suite struct LeagueFixtureTests {
@@ -60,6 +60,19 @@ private let fixtures: [LeagueFixture] = [
         #expect(detail.teamStats.count == f.teamStats)
         #expect(detail.boxScores.count == f.boxScores)
         #expect(detail.boxScores.allSatisfy { !$0.labels.isEmpty && !$0.title.isEmpty })
+    }
+
+    @Test func mlbTeamStatsComeFromTheGroups() throws {
+        let stats = try ESPNProvider.parseSummary(data("mlb-summary")).teamStats
+        #expect(stats.first?.label == "Hits")
+        #expect(stats.first { $0.label == "Errors" } != nil)
+    }
+
+    @Test func soccerBoxScoreComesFromTheLineups() throws {
+        let box = try #require(ESPNProvider.parseSummary(data("epl-summary")).boxScores.first)
+        #expect(box.labels.prefix(3) == ["POS", "G", "A"])
+        // Eleven starters plus the subs who came on, never the unused bench.
+        #expect(box.rows.count == 16)
     }
 
     @Test func everyKnownLeagueHasAnESPNMapping() async {

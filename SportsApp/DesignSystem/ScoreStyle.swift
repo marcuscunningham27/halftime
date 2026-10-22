@@ -192,6 +192,8 @@ struct Backdrop: View {
     /// matches iOS's #2D6526 instead of greying out).
     private var folds: [Color] {
         let depth = flat ? 0.65 : 1.25 // how far folds swing from the base colour
+        // Pale team colours (white, sky blue, yellow) are darkened until white text reads on the lightest fold.
+        let color = color.readable(boost: 1 + 0.18 * depth)
         let light = color.brightness(1 + 0.18 * depth), lit = color.brightness(1 + 0.07 * depth)
         let dark = color.brightness(1 - 0.28 * depth), shade = color.brightness(1 - 0.14 * depth)
         return [lit, dark, light, shade,
@@ -233,6 +235,12 @@ extension Color {
         var hue: CGFloat = 0, saturation: CGFloat = 0, brightness: CGFloat = 0, alpha: CGFloat = 0
         rgb.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
         return Color(hue: hue, saturation: saturation, brightness: min(1, brightness * factor), opacity: alpha)
+    }
+
+    /// Darkened, keeping hue and saturation, until white text on it (brightened by `boost`) meets WCAG AA.
+    func readable(boost: Double = 1) -> Color {
+        guard let rgb = NSColor(self).usingColorSpace(.sRGB) else { return self }
+        return brightness(Contrast.readableScale(rgb.redComponent, rgb.greenComponent, rgb.blueComponent, boost: boost))
     }
 
     /// The iOS Sports app's green, #2D6526, sampled from its home screen.
