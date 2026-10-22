@@ -176,7 +176,8 @@ struct Backdrop: View {
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { context in
-            let t = Float(reduceMotion ? 0 : context.date.timeIntervalSinceReferenceDate)
+            // Double: as a Float, a date this large only moves in 64-second steps, so the folds froze then jumped.
+            let t = reduceMotion ? 0 : context.date.timeIntervalSinceReferenceDate
             MeshGradient(width: 4, height: 4, points: Self.points(t), colors: folds, smoothsColors: true)
         }
         // Lighter at the top than before, so the colour carries further down behind the cards.
@@ -190,7 +191,7 @@ struct Backdrop: View {
     /// They change brightness only, keeping hue and saturation, so the colour stays true (the Home green
     /// matches iOS's #2D6526 instead of greying out).
     private var folds: [Color] {
-        let depth = flat ? 0.45 : 1.0 // how far folds swing from the base colour
+        let depth = flat ? 0.65 : 1.25 // how far folds swing from the base colour
         let light = color.brightness(1 + 0.18 * depth), lit = color.brightness(1 + 0.07 * depth)
         let dark = color.brightness(1 - 0.28 * depth), shade = color.brightness(1 - 0.14 * depth)
         return [lit, dark, light, shade,
@@ -200,8 +201,8 @@ struct Backdrop: View {
     }
 
     /// Inner and edge points ripple on slow, out-of-phase waves like a flag; corners stay pinned.
-    static func points(_ t: Float) -> [SIMD2<Float>] {
-        func wave(_ speed: Float, _ phase: Float, _ size: Float = 0.07) -> Float { size * sin(t * speed + phase) }
+    static func points(_ t: Double) -> [SIMD2<Float>] {
+        func wave(_ speed: Double, _ phase: Double, _ size: Float = 0.07) -> Float { size * Float(sin(t * speed + phase)) }
         let third: Float = 1 / 3, twoThirds: Float = 2 / 3
         return [
             [0, 0], [third + wave(0.8, 0), 0], [twoThirds + wave(0.7, 1), 0], [1, 0],
