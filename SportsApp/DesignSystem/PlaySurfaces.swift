@@ -19,7 +19,7 @@ struct PlaySurfaceView: View {
         case League.mlb.id:
             if game.status == .live || !hits.isEmpty {
                 GamecastView(game: game, plays: detail?.plays ?? [], court: detail?.court) {
-                    BaseballDiamondView(game: game, plays: detail?.plays ?? []).frame(maxWidth: 460)
+                    BaseballDiamondView(game: game, plays: detail?.plays ?? [], teamStats: detail?.teamStats ?? [])
                 }
                 .frame(maxWidth: 600)
             }
@@ -83,45 +83,99 @@ private struct LegendItem: View {
 
 // MARK: - Baseball
 
-/// ESPN's Gamecast diamond: count and outs, runners on base, and the latest batted ball arcing to where it landed.
+/// ESPN's Gamecast ballpark, styled like the court and football field: an info row (the count, outs and batter
+/// while live; runs, hits and errors once it's over), the outfield wall in the home team's colour with its code in
+/// centre field, mown grass with the home logo, runners glowing in the batting team's colour, earlier balls in play
+/// as dots (filled for hits, hollow for outs) and the latest arcing out with a pulse where it landed.
 /// Drawn in ESPN's 250-unit hit-chart space, with home plate at (125, 204).
 struct BaseballDiamondView: View {
     let game: Game
     let plays: [Play]
+    var teamStats: [TeamStat] = []
 
     private static let home = CGPoint(x: 125, y: 204)
     private static let first = CGPoint(x: 152.7, y: 176.3)
     private static let second = CGPoint(x: 125, y: 148.6)
     private static let third = CGPoint(x: 97.3, y: 176.3)
+    /// The drawing runs from just beyond the wall (its band peaks at y ≈ 21.5) to behind home plate (y = 218).
+    private static let top: CGFloat = 18, height: CGFloat = 200
 
     var body: some View {
         let state = game.status == .live ? game.situation?.baseball : nil
         VStack(spacing: 10) {
-            if let state {
-                HStack(spacing: 22) {
-                    count("Balls", state.balls, of: 4)
-                    count("Strikes", state.strikes, of: 3)
-                    count("Outs", state.outs, of: 3)
+            infoRow(state).padding(.bottom, 4)
+            GeometryReader { geometry in
+                let scale = geometry.size.width / 250
+                ZStack(alignment: .topLeading) {
+                    Canvas { context, _ in
+                        context.translateBy(x: 0, y: -Self.top * scale)
+                        context.scaleBy(x: scale, y: scale)
+                        drawField(&context)
+                    }
+                    // The home team's code on the centre-field wall and its logo on the grass, as the court has at centre.
+                    Text(game.home.team.abbreviation)
+                        .font(.system(size: 7 * scale, weight: .heavy).width(.expanded))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .position(view(CGPoint(x: 125, y: 26), scale))
+                    TeamLogo(team: game.home.team, size: 40 * scale)
+                        .opacity(0.8)
+                        .position(view(CGPoint(x: 125, y: 88), scale))
+                    Canvas { context, _ in
+                        context.translateBy(x: 0, y: -Self.top * scale)
+                        context.scaleBy(x: scale, y: scale)
+                        drawBases(&context, state: state)
+                        drawHits(&context)
+                    }
+                    if let last = atBats.last, let spot = last.spot {
+                        LastShotPulse(point: CGPoint(x: point(spot).x, y: point(spot).y - Self.top),
+                                      color: battingTeam?.color ?? .white, made: last.play.isBaseHit, units: 250)
+                            .id(last.play.id)
+                    }
                 }
             }
-            Canvas { context, size in
-                // The field runs from the fence (y ≈ 30) to behind home plate (y ≈ 215).
-                let scale = min(size.width / 250, size.height / 192)
-                context.translateBy(x: (size.width - 250 * scale) / 2, y: -26 * scale)
-                context.scaleBy(x: scale, y: scale)
-                drawField(&context)
-                drawBases(&context, state: state)
-                drawHits(&context)
-            }
-            .frame(height: 270)
-            .rotation3DEffect(.degrees(30), axis: (x: 1, y: 0, z: 0), perspective: 0.5)
-            if let state, state.batter != nil || state.pitcher != nil {
-                Text([state.batter.map { "At bat: \($0)" }, state.pitcher.map { "Pitching: \($0)" }].compactMap { $0 }.joined(separator: " · "))
-                    .font(.caption).foregroundStyle(.secondary)
+            .aspectRatio(250 / Self.height, contentMode: .fit)
+            .frame(maxWidth: 420)
+            .rotation3DEffect(.degrees(22), axis: (x: 1, y: 0, z: 0), perspective: 0.5)
+            if let pitcher = state?.pitcher {
+                Text("Pitching: \(pitcher)").font(.caption).foregroundStyle(.secondary)
             }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText(state))
+    }
+
+    /// COUNT | OUTS | AT BAT while live; RUNS | HITS | ERRORS (away–home) otherwise.
+    @ViewBuilder
+    private func infoRow(_ state: Game.Situation.Baseball?) -> some View {
+        HStack(spacing: 0) {
+            if let state {
+                GamecastStat(title: "Count", value: "\(state.balls)–\(state.strikes)")
+                Divider().frame(height: 34)
+                GamecastStat(title: "Outs", value: String(repeating: "●", count: state.outs) + String(repeating: "○", count: max(0, 3 - state.outs)))
+                Divider().frame(height: 34)
+                GamecastStat(title: "At Bat", value: state.batter)
+            } else {
+                GamecastStat(title: "Runs", value: game.away.score.flatMap { away in game.home.score.map { "\(away)–\($0)" } })
+                Divider().frame(height: 34)
+                GamecastStat(title: "Hits", value: stat("Hits"))
+                Divider().frame(height: 34)
+                GamecastStat(title: "Errors", value: stat("Errors"))
+            }
+        }
+    }
+
+    private func stat(_ label: String) -> String? {
+        teamStats.first { $0.label == label }.map { "\($0.away)–\($0.home)" }
+    }
+
+    /// The team at the plate: whoever the latest at-bat belongs to.
+    private var battingTeam: Team? {
+        atBats.last.flatMap { team(of: $0.play, in: game) }
+    }
+
+    /// Hit-chart units to this view's points (the chart is scaled to the width and starts at `top`).
+    private func view(_ point: CGPoint, _ scale: CGFloat) -> CGPoint {
+        CGPoint(x: point.x * scale, y: (point.y - Self.top) * scale)
     }
 
     /// One entry per at-bat, newest last: its result row (for the words) and where the ball went, if it was
@@ -142,82 +196,100 @@ struct BaseballDiamondView: View {
         return list
     }
 
-    private func count(_ title: String, _ value: Int, of total: Int) -> some View {
-        HStack(spacing: 6) {
-            Text(title.uppercased()).font(.caption.weight(.bold)).foregroundStyle(.secondary)
-            ForEach(0..<(total - 1), id: \.self) { index in
-                Circle()
-                    .fill(index < value ? (title == "Outs" ? Color.red : Color.green) : Color.clear)
-                    .overlay(Circle().strokeBorder(.white.opacity(0.5)))
-                    .frame(width: 11, height: 11)
-            }
-        }
-    }
-
     private func point(_ location: Play.Location) -> CGPoint {
         CGPoint(x: location.x * 250, y: location.y * 250)
     }
 
     private func drawField(_ context: inout GraphicsContext) {
-        let home = Self.home
-        // Outfield grass out to the fence, between the foul lines, with a warning track.
-        var fan = Path()
-        fan.move(to: home)
-        fan.addLine(to: CGPoint(x: home.x - 118, y: home.y - 118))
-        fan.addQuadCurve(to: CGPoint(x: home.x + 118, y: home.y - 118), control: CGPoint(x: home.x, y: home.y - 230))
-        fan.closeSubpath()
-        context.fill(fan, with: .color(Color(red: 0.62, green: 0.48, blue: 0.32)))
-        var grass = Path()
-        grass.move(to: home)
-        grass.addLine(to: CGPoint(x: home.x - 112, y: home.y - 112))
-        grass.addQuadCurve(to: CGPoint(x: home.x + 112, y: home.y - 112), control: CGPoint(x: home.x, y: home.y - 220))
-        grass.closeSubpath()
-        context.fill(grass, with: .linearGradient(Gradient(colors: [Color(red: 0.2, green: 0.55, blue: 0.22), Color(red: 0.28, green: 0.65, blue: 0.28)]),
-                                                  startPoint: CGPoint(x: home.x, y: home.y - 200), endPoint: home))
-        // Infield dirt arc and the grass square inside the bases.
-        var dirt = Path()
-        dirt.move(to: home)
-        dirt.addLine(to: CGPoint(x: home.x - 50, y: home.y - 50))
-        dirt.addQuadCurve(to: CGPoint(x: home.x + 50, y: home.y - 50), control: CGPoint(x: home.x, y: home.y - 98))
-        dirt.closeSubpath()
-        context.fill(dirt, with: .color(Color(red: 0.76, green: 0.58, blue: 0.38)))
+        let home = Self.home, dirt = Color(red: 0.76, green: 0.58, blue: 0.38)
+        func fan(_ reach: CGFloat, _ depth: CGFloat) -> Path {
+            Path { path in
+                path.move(to: home)
+                path.addLine(to: CGPoint(x: home.x - reach, y: home.y - reach))
+                path.addQuadCurve(to: CGPoint(x: home.x + reach, y: home.y - reach), control: CGPoint(x: home.x, y: home.y - depth))
+                path.closeSubpath()
+            }
+        }
+        // The outfield wall in the home team's colour, then the warning track inside it.
+        var wall = Path()
+        wall.move(to: CGPoint(x: home.x - 121, y: home.y - 121))
+        wall.addQuadCurve(to: CGPoint(x: home.x + 121, y: home.y - 121), control: CGPoint(x: home.x, y: home.y - 236))
+        context.stroke(wall, with: .color(game.home.team.backdropColor), style: StrokeStyle(lineWidth: 8, lineCap: .butt))
+        context.fill(fan(118, 230), with: .color(dirt.mix(with: .black, by: 0.15)))
+        // Grass mown in stripes, in the football field's turf greens, lit like the court.
+        let grass = fan(112, 220)
+        context.drawLayer { layer in
+            layer.clip(to: grass)
+            for band in stride(from: CGFloat(20), to: 220, by: 12) {
+                layer.fill(Path(CGRect(x: 0, y: band, width: 250, height: 12)),
+                           with: .color(Int(band / 12).isMultiple(of: 2) ? Color.turfLight : Color.turfDark))
+            }
+            layer.fill(Path(CGRect(x: 0, y: 0, width: 250, height: 250)), with: .linearGradient(
+                Gradient(colors: [.white.opacity(0.1), .clear, .black.opacity(0.12)]),
+                startPoint: CGPoint(x: 0, y: 30), endPoint: CGPoint(x: 250, y: 220)))
+        }
+        // Infield dirt and the grass square inside the bases.
+        context.fill(fan(50, 98), with: .color(dirt))
         var square = Path()
         square.move(to: CGPoint(x: home.x, y: home.y - 6))
         square.addLine(to: CGPoint(x: Self.first.x - 6, y: Self.first.y))
         square.addLine(to: CGPoint(x: Self.second.x, y: Self.second.y + 6))
         square.addLine(to: CGPoint(x: Self.third.x + 6, y: Self.third.y))
         square.closeSubpath()
-        context.fill(square, with: .color(Color(red: 0.26, green: 0.62, blue: 0.27)))
-        // Foul lines and the mound.
+        context.fill(square, with: .color(.turfLight))
+        // Chalk: foul lines out to the wall and the batter's boxes; the mound with its rubber; the plate's dirt circle.
+        let chalk = GraphicsContext.Shading.color(.white.opacity(0.9))
         var lines = Path()
-        lines.move(to: CGPoint(x: home.x - 112, y: home.y - 112)); lines.addLine(to: home)
-        lines.addLine(to: CGPoint(x: home.x + 112, y: home.y - 112))
-        context.stroke(lines, with: .color(.white.opacity(0.85)), lineWidth: 0.8)
-        context.fill(Path(ellipseIn: CGRect(x: 120, y: 172, width: 10, height: 10)), with: .color(Color(red: 0.76, green: 0.58, blue: 0.38)))
-        context.fill(Path(ellipseIn: CGRect(x: home.x - 9, y: home.y - 7, width: 18, height: 12)), with: .color(Color(red: 0.76, green: 0.58, blue: 0.38)))
+        lines.move(to: CGPoint(x: home.x - 118, y: home.y - 118)); lines.addLine(to: home)
+        lines.addLine(to: CGPoint(x: home.x + 118, y: home.y - 118))
+        context.stroke(lines, with: chalk, lineWidth: 1)
+        context.fill(Path(ellipseIn: CGRect(x: home.x - 10, y: home.y - 7, width: 20, height: 14)), with: .color(dirt))
+        for side in [-1.0, 1.0] {
+            context.stroke(Path(CGRect(x: home.x + side * 4 - (side < 0 ? 4 : 0), y: home.y - 4, width: 4, height: 8)), with: chalk, lineWidth: 0.6)
+        }
+        context.fill(Path(ellipseIn: CGRect(x: 119, y: 171, width: 12, height: 12)), with: .color(dirt.mix(with: .white, by: 0.1)))
+        context.fill(Path(CGRect(x: 123, y: 176.5, width: 4, height: 1)), with: chalk)
     }
 
     private func drawBases(_ context: inout GraphicsContext, state: Game.Situation.Baseball?) {
         let occupied = [state?.onFirst ?? false, state?.onSecond ?? false, state?.onThird ?? false]
+        let runnerColor = battingTeam?.color ?? Color(red: 0.2, green: 0.45, blue: 1)
         for (index, base) in [Self.first, Self.second, Self.third].enumerated() {
             let diamond = Path { path in
-                path.move(to: CGPoint(x: base.x, y: base.y - 4)); path.addLine(to: CGPoint(x: base.x + 4, y: base.y))
-                path.addLine(to: CGPoint(x: base.x, y: base.y + 4)); path.addLine(to: CGPoint(x: base.x - 4, y: base.y))
+                path.move(to: CGPoint(x: base.x, y: base.y - 5.5)); path.addLine(to: CGPoint(x: base.x + 5.5, y: base.y))
+                path.addLine(to: CGPoint(x: base.x, y: base.y + 5.5)); path.addLine(to: CGPoint(x: base.x - 5.5, y: base.y))
                 path.closeSubpath()
             }
-            context.fill(diamond, with: .color(occupied[index] ? Color(red: 0.2, green: 0.45, blue: 1) : .white))
+            if occupied[index] {
+                // A runner: the base glows in the batting team's colour.
+                context.fill(Path(ellipseIn: CGRect(x: base.x - 10, y: base.y - 10, width: 20, height: 20)), with: .color(runnerColor.opacity(0.35)))
+                context.fill(diamond, with: .color(runnerColor))
+                context.stroke(diamond, with: .color(.white), lineWidth: 1)
+            } else {
+                context.fill(diamond, with: .color(.white))
+            }
         }
-        context.fill(Path(ellipseIn: CGRect(x: Self.home.x - 2.5, y: Self.home.y - 2.5, width: 5, height: 5)), with: .color(.white))
+        var plate = Path()
+        plate.move(to: CGPoint(x: Self.home.x - 3, y: Self.home.y - 2)); plate.addLine(to: CGPoint(x: Self.home.x + 3, y: Self.home.y - 2))
+        plate.addLine(to: CGPoint(x: Self.home.x + 3, y: Self.home.y)); plate.addLine(to: CGPoint(x: Self.home.x, y: Self.home.y + 2.5))
+        plate.addLine(to: CGPoint(x: Self.home.x - 3, y: Self.home.y)); plate.closeSubpath()
+        context.fill(plate, with: .color(.white))
     }
 
     private func drawHits(_ context: inout GraphicsContext) {
         let atBats = atBats
-        // Earlier batted balls as dots; the latest at-bat gets the flight line, but only if it was put in play.
+        // Earlier balls in play: filled in the team's colour for hits, hollow for outs, as the court marks makes and misses.
         for (play, location) in atBats.dropLast().compactMap({ at in at.spot.map { (at.play, $0) } }).suffix(7) {
-            let spot = point(location)
-            let dot = Path(ellipseIn: CGRect(x: spot.x - 2, y: spot.y - 2, width: 4, height: 4))
-            context.fill(dot, with: .color((team(of: play, in: game)?.color ?? .white).opacity(0.85)))
-            context.stroke(dot, with: .color(.white.opacity(0.8)), lineWidth: 0.6)
+            let spot = point(location), color = team(of: play, in: game)?.color ?? .white
+            let dot = Path(ellipseIn: CGRect(x: spot.x - 3.5, y: spot.y - 3.5, width: 7, height: 7))
+            if play.isBaseHit {
+                context.fill(dot, with: .color(color))
+                context.stroke(dot, with: .color(.white.opacity(0.85)), lineWidth: 0.8)
+            } else {
+                // A dark casing under the ring keeps it readable on dirt and grass, whatever the team colour.
+                context.stroke(dot, with: .color(.black.opacity(0.55)), lineWidth: 3)
+                context.stroke(dot, with: .color(color.mix(with: .white, by: 0.45)), lineWidth: 1.5)
+            }
         }
         guard let last = atBats.last, let location = last.spot else { return }
         let spot = point(location)
@@ -230,11 +302,11 @@ struct BaseballDiamondView: View {
         } else {
             path.addLine(to: spot)
         }
-        // A white casing under the dark line keeps it readable over dark backgrounds as well as the grass.
-        context.stroke(path, with: .color(.white.opacity(0.9)), style: StrokeStyle(lineWidth: 2.6, lineCap: .round))
-        context.stroke(path, with: .color(.black.opacity(0.85)), style: StrokeStyle(lineWidth: 1.2, lineCap: .round))
-        context.stroke(Path(ellipseIn: CGRect(x: spot.x - 7, y: spot.y - 4, width: 14, height: 8)), with: .color(.green), lineWidth: 2.5)
-        context.fill(Path(ellipseIn: CGRect(x: spot.x - 3, y: spot.y - 2, width: 6, height: 4)), with: .color(.blue))
+        // White casing under the batting team's colour, like the court's last basket.
+        let color = battingTeam?.color ?? .white
+        context.stroke(path, with: .color(.white.opacity(0.9)), style: StrokeStyle(lineWidth: 3, lineCap: .round))
+        context.stroke(path, with: .color(color.mix(with: .white, by: 0.2)), style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
+        context.stroke(Path(ellipseIn: CGRect(x: spot.x - 4.5, y: spot.y - 4.5, width: 9, height: 9)), with: .color(.white), lineWidth: 1.2)
     }
 
     private func accessibilityText(_ state: Game.Situation.Baseball?) -> String {

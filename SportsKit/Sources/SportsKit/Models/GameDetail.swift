@@ -211,3 +211,40 @@ extension Play {
         return homeOffense ? end - start : start - end
     }
 }
+
+extension Play {
+    /// Names a baseball result from ESPN's wording ("Kwan reached on infield single…" → "Single"), for rows ESPN
+    /// leaves as "Play Result". Checked in order, so "grounded into double play" reads as a double play. nil if unknown.
+    static func baseballResult(_ text: String) -> String? {
+        let text = text.lowercased()
+        let names: [(String, [String])] = [
+            ("Pitching Change", ["relieved"]),
+            ("Stolen Base", [" stole "]),
+            ("Caught Stealing", ["caught stealing"]),
+            ("Substitution", [" ran for ", " hit for ", " in left field", " in center field", " in right field", " at catcher"]),
+            ("Double Play", ["double play"]),
+            ("Sacrifice Fly", ["sacrifice fly"]),
+            ("Sacrifice", ["sacrifice bunt", "bunted"]),
+            ("Home Run", ["homered"]),
+            ("Triple", ["tripled"]),
+            ("Double", ["doubled"]),
+            ("Single", ["singled", "infield single"]),
+            ("Strikeout", ["struck out"]),
+            ("Walk", ["walked"]),
+            ("Hit By Pitch", ["hit by pitch"]),
+            ("Fielder's Choice", ["fielder's choice"]),
+            ("Error", ["reached on", "error"]),
+            ("Ground Out", ["grounded"]),
+            ("Fly Out", ["flied"]),
+            ("Line Out", ["lined"]),
+            ("Pop Out", ["popped"]),
+            ("Foul Out", ["fouled out"]),
+        ]
+        return names.first { $0.1.contains(where: text.contains) }?.0
+    }
+
+    /// A single, double, triple or home run.
+    public var isBaseHit: Bool {
+        ["Single", "Double", "Triple", "Home Run"].contains(headline ?? "")
+    }
+}

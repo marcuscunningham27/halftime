@@ -249,6 +249,10 @@ public actor ESPNProvider: SportsProvider {
                 if dto.type?.text == "Play Result", let pitch = lastPitch, pitch.text?.hasSuffix("In Play") == true {
                     play = play.headlined(pitch.type?.text)
                 }
+                // Strikeouts, walks and the like have no ball in play to name them, so read the result's own words.
+                if dto.type?.text == "Play Result", play.headline == nil {
+                    play = play.headlined(Play.baseballResult(play.text))
+                }
                 if dto.scoringPlay == nil, let away = dto.awayScore, let home = dto.homeScore {
                     play = play.scoring((away, home) != (previous.0 ?? 0, previous.1 ?? 0))
                     previous = (away, home)
