@@ -12,6 +12,8 @@ public struct GameDetail: Hashable, Sendable {
     public var court: CourtSituation?
     /// Every located shot, for the soccer shot map (from ESPN's match commentary).
     public var shots: [Shot] = []
+    /// Each team's score by period, from the summary; fills the line score where the scoreboard omits it (soccer).
+    public var periodScores: [Team.ID: [Int]] = [:]
 
     public init(plays: [Play], drives: [Drive] = [], boxScores: [BoxScore], teamStats: [TeamStat],
                 overview: GameOverview = GameOverview()) {
@@ -36,13 +38,22 @@ public struct Shot: Identifiable, Hashable, Sendable {
     public let location: Play.Location
     /// e.g. "Brandon Thomas-Asante Shot Block · 8'"
     public let text: String
+    /// 1 or 2 for the halves; higher in extra time.
+    public let period: Int
+    public let shooter: String?
+    /// Where the ball ended up, same frame as `location`; for goals, the spot it crossed the line.
+    public let end: Play.Location?
 
-    public init(id: String, teamID: Team.ID, outcome: Outcome, location: Play.Location, text: String) {
+    public init(id: String, teamID: Team.ID, outcome: Outcome, location: Play.Location, text: String,
+                period: Int = 1, shooter: String? = nil, end: Play.Location? = nil) {
         self.id = id
         self.teamID = teamID
         self.outcome = outcome
         self.location = location
         self.text = text
+        self.period = period
+        self.shooter = shooter
+        self.end = end
     }
 }
 
@@ -164,13 +175,16 @@ public struct BoxScore: Identifiable, Hashable, Sendable {
     public let title: String
     public let labels: [String]
     public let rows: [Row]
+    /// What the column labels mean, where they aren't obvious (soccer).
+    public var key: String?
 
-    public init(teamID: Team.ID, category: String, title: String, labels: [String], rows: [Row]) {
+    public init(teamID: Team.ID, category: String, title: String, labels: [String], rows: [Row], key: String? = nil) {
         self.teamID = teamID
         self.category = category
         self.title = title
         self.labels = labels
         self.rows = rows
+        self.key = key
     }
 }
 

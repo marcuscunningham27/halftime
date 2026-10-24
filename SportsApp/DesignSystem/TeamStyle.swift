@@ -34,8 +34,12 @@ struct LeagueLogo: View {
 }
 
 extension Team {
-    var color: Color {
-        guard let hex = colorHex, hex.count == 6, let value = UInt32(hex, radix: 16) else { return .secondary }
+    var color: Color { Self.color(colorHex) }
+    /// Behind the team's game page; see `backdropHex`.
+    var backdropColor: Color { Self.color(backdropHex) }
+
+    private static func color(_ hex: String?) -> Color {
+        guard let hex, hex.count == 6, let value = UInt32(hex, radix: 16) else { return .secondary }
         return Color(red: Double(value >> 16 & 0xFF) / 255,
                      green: Double(value >> 8 & 0xFF) / 255,
                      blue: Double(value & 0xFF) / 255)

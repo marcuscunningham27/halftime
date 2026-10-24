@@ -39,8 +39,11 @@ struct PlaySurfaceView: View {
                 .frame(maxWidth: 600)
             }
         case League.epl.id, League.ucl.id, League.mls.id:
-            if let shots = detail?.shots, !shots.isEmpty {
-                SoccerPitchView(game: game, shots: shots).frame(maxWidth: 600)
+            if game.status == .live || !(detail?.shots.isEmpty ?? true) {
+                GamecastView(game: game, plays: detail?.plays ?? [], court: nil) {
+                    SoccerPitchView(game: game, shots: detail?.shots ?? [], teamStats: detail?.teamStats ?? [])
+                }
+                .frame(maxWidth: 600)
             }
         default:
             EmptyView()
@@ -477,40 +480,56 @@ struct HockeyRinkView: View {
 
 // MARK: - Soccer
 
-/// ESPN-style shot map: a flat pitch with every shot marked by how it ended, the home side shooting
-/// right and the away side left. Drawn in metres (105 × 68).
+/// Soccer's game cast surface, styled like the football field: the info row above, a tilted pitch with each
+/// team's colour and code behind the goal it defends (away on the left, as in the score header), the home logo
+/// in the centre circle, and every shot marked by how it ended. Pitch drawn in metres (105 × 68).
 struct SoccerPitchView: View {
     let game: Game
     let shots: [Shot]
+    let teamStats: [TeamStat]
+
+    /// nil shows the whole match.
+    @State private var half: Int?
+    @State private var shooter: String?
+
+    /// Each end's team band, as a share of the pitch length (the football field's end zones are 1/10).
+    private static let band = 0.08
+
+    private var shown: [Shot] {
+        shots.filter { (half == nil || $0.period == half) && (shooter == nil || $0.shooter == shooter) }
+    }
 
     var body: some View {
         VStack(spacing: 10) {
+            HStack(spacing: 0) {
+                GamecastStat(title: "Shots", value: pair { shots in shots.count })
+                Divider().frame(height: 34)
+                GamecastStat(title: "On Target", value: pair { shots in shots.filter { [.goal, .save].contains($0.outcome) }.count })
+                Divider().frame(height: 34)
+                GamecastStat(title: "Possession", value: possession)
+            }
+            .padding(.bottom, 4)
+            pitch
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Shot map: " + Shot.Outcome.allCases.map { outcome in
+                    "\(shown.filter { $0.outcome == outcome }.count) \(outcome.title.lowercased())"
+                }.joined(separator: ", "))
             HStack {
-                LegendItem(team: game.away.team, text: "\(count(game.away.team)) shots")
+                Picker("Half", selection: $half) {
+                    Text("All").tag(Int?.none)
+                    Text("1st Half").tag(Int?.some(1))
+                    Text("2nd Half").tag(Int?.some(2))
+                }
+                .pickerStyle(.segmented).fixedSize()
                 Spacer()
-                LegendItem(team: game.home.team, text: "\(count(game.home.team)) shots")
-            }
-            VStack(spacing: 0) {
-                Canvas { context, size in
-                    context.scaleBy(x: size.width / 105, y: size.width / 105)
-                    drawPitch(&context)
+                Picker("Player", selection: $shooter) {
+                    Text("All Players").tag(String?.none)
+                    ForEach(Array(Set(shots.compactMap(\.shooter))).sorted(), id: \.self) { Text($0).tag(String?.some($0)) }
                 }
-                .aspectRatio(105 / 68, contentMode: .fit)
-                .overlay {
-                    GeometryReader { geo in
-                        // Goals last, so they sit on top of nearby misses.
-                        ForEach(shots.sorted { ($0.outcome == .goal ? 1 : 0) < ($1.outcome == .goal ? 1 : 0) }) { shot in
-                            ShotMarker(outcome: shot.outcome)
-                                .position(point(shot, in: geo.size))
-                                .help(shot.text)
-                        }
-                    }
-                }
-                // The pitch's front edge, for the same raised look as the football field.
-                Color.turfDark.brightness(-0.25).frame(height: 7)
+                .fixedSize()
             }
-            .clipShape(.rect(cornerRadius: 8))
-            .rotation3DEffect(.degrees(22), axis: (x: 1, y: 0, z: 0), perspective: 0.5)
+            .labelsHidden()
+            .controlSize(.small)
             HStack(spacing: 6) {
                 ForEach(Shot.Outcome.allCases, id: \.self) { outcome in
                     HStack(spacing: 5) {
@@ -522,19 +541,83 @@ struct SoccerPitchView: View {
                 }
             }
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Shot map: " + Shot.Outcome.allCases.map { outcome in
-            "\(shots.filter { $0.outcome == outcome }.count) \(outcome.title.lowercased())"
-        }.joined(separator: ", "))
     }
 
-    private func count(_ team: Team) -> Int { shots.filter { $0.teamID == team.id }.count }
+    private var pitch: some View {
+        VStack(spacing: 0) {
+            GeometryReader { geometry in
+                let size = geometry.size, bandWidth = size.width * Self.band / (1 + 2 * Self.band)
+                let field = CGRect(x: bandWidth, y: 0, width: size.width - 2 * bandWidth, height: size.height)
+                ZStack(alignment: .topLeading) {
+                    HStack(spacing: 0) {
+                        game.away.team.backdropColor.frame(width: bandWidth)
+                        Canvas { context, size in
+                            context.scaleBy(x: size.width / 105, y: size.height / 68)
+                            drawPitch(&context)
+                        }
+                        game.home.team.backdropColor.frame(width: bandWidth)
+                    }
+                    EndZoneName(name: game.away.team.abbreviation, angle: -90).frame(width: bandWidth, height: size.height)
+                    EndZoneName(name: game.home.team.abbreviation, angle: 90).frame(width: bandWidth, height: size.height)
+                        .offset(x: size.width - bandWidth)
+                    // The home team's logo in the centre circle, under the shots, as at the football field's midfield.
+                    TeamLogo(team: game.home.team, size: size.height * 0.24)
+                        .opacity(0.8)
+                        .position(x: size.width / 2, y: size.height / 2)
+                    // Each goal arcs from where it was struck to where it crossed the line, like a thrown pass.
+                    Path { path in
+                        for shot in shown where shot.outcome == .goal {
+                            guard let end = shot.end else { continue }
+                            let from = point(shot.location, team: shot.teamID, in: field)
+                            let to = point(end, team: shot.teamID, in: field)
+                            path.move(to: from)
+                            path.addQuadCurve(to: to, control: CGPoint(x: (from.x + to.x) / 2,
+                                                                       y: min(from.y, to.y) - max(14, abs(to.x - from.x) * 0.35)))
+                        }
+                    }
+                    .stroke(.white.opacity(0.9), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [1, 4]))
+                    // Goals last, so they sit on top of nearby misses.
+                    ForEach(shown.sorted { ($0.outcome == .goal ? 1 : 0) < ($1.outcome == .goal ? 1 : 0) }) { shot in
+                        ShotMarker(outcome: shot.outcome)
+                            .position(point(shot.location, team: shot.teamID, in: field))
+                            .help(shot.text)
+                    }
+                }
+            }
+            .aspectRatio((1 + 2 * Self.band) * 105 / 68, contentMode: .fit)
+            // The pitch's front edge in each team's colour at its end, for the football field's raised look.
+            GeometryReader { geometry in
+                HStack(spacing: 0) {
+                    game.away.team.backdropColor.frame(width: geometry.size.width * Self.band / (1 + 2 * Self.band))
+                    Color.turfDark
+                    game.home.team.backdropColor.frame(width: geometry.size.width * Self.band / (1 + 2 * Self.band))
+                }
+            }
+            .brightness(-0.25)
+            .frame(height: 7)
+        }
+        .clipShape(.rect(cornerRadius: 8))
+        .rotation3DEffect(.degrees(22), axis: (x: 1, y: 0, z: 0), perspective: 0.5)
+        // Real pitch proportions, at most 260pt tall. Capped by width so the front edge stays as wide as the pitch.
+        .frame(maxWidth: 260 * (1 + 2 * Self.band) * 105 / 68)
+    }
 
-    /// Each team's shots come in its own attacking frame; the away side's are turned to face left.
-    private func point(_ shot: Shot, in size: CGSize) -> CGPoint {
-        let home = shot.teamID == game.home.team.id
-        return CGPoint(x: (home ? shot.location.x : 1 - shot.location.x) * size.width,
-                       y: (home ? shot.location.y : 1 - shot.location.y) * size.height)
+    /// "away–home" for a count over each team's shown shots.
+    private func pair(_ count: ([Shot]) -> Int) -> String {
+        "\(count(shown.filter { $0.teamID == game.away.team.id }))–\(count(shown.filter { $0.teamID == game.home.team.id }))"
+    }
+
+    /// The whole match's possession, from the team stats.
+    private var possession: String? {
+        teamStats.first { $0.label.localizedCaseInsensitiveCompare("Possession") == .orderedSame }
+            .map { "\($0.away)–\($0.home)%" }
+    }
+
+    /// Shots come in the shooter's attacking frame. Away defends the left goal, so it shoots right; home is turned to face left.
+    private func point(_ location: Play.Location, team: Team.ID, in field: CGRect) -> CGPoint {
+        let away = team == game.away.team.id
+        return CGPoint(x: field.minX + (away ? location.x : 1 - location.x) * field.width,
+                       y: field.minY + (away ? location.y : 1 - location.y) * field.height)
     }
 
     private func drawPitch(_ context: inout GraphicsContext) {

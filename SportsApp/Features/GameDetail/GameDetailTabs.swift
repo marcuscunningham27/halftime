@@ -183,6 +183,9 @@ struct BoxScoreView: View {
                             .padding(.vertical, 6)
                         }
                         .scrollIndicators(.never)
+                        if let key = box.key {
+                            Text(key).font(.caption2).foregroundStyle(.secondary).padding(.bottom, 4)
+                        }
                     }
                 }
             }

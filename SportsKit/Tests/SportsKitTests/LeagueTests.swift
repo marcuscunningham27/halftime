@@ -76,9 +76,16 @@ private let fixtures: [LeagueFixture] = [
 
     @Test func soccerBoxScoreComesFromTheLineups() throws {
         let box = try #require(ESPNProvider.parseSummary(data("epl-summary")).boxScores.first)
-        #expect(box.labels.prefix(3) == ["POS", "G", "A"])
+        #expect(box.labels.prefix(5) == ["POS", "G", "A", "SH", "ST"])
+        #expect(box.key?.contains("ST on target") == true)
         // Eleven starters plus the subs who came on, never the unused bench.
         #expect(box.rows.count == 16)
+    }
+
+    @Test func soccerHalfScoresComeFromTheSummary() throws {
+        // The scoreboard has no half-by-half scores for soccer; the summary's header does.
+        let detail = try ESPNProvider.parseSummary(data("epl-summary"), leagueID: League.epl.id)
+        #expect(detail.periodScores == ["367": [1, 2], "388": [0, 1]])
     }
 
     @Test func soccerShotsComeFromTheCommentary() throws {
@@ -89,6 +96,10 @@ private let fixtures: [LeagueFixture] = [
         // Headers, volleys and penalties count as goals; the own goal isn't a shot.
         let ucl = try ESPNProvider.parseSummary(data("ucl-summary"), leagueID: League.ucl.id).shots
         #expect(ucl.filter { $0.outcome == .goal }.count == 3)
+        // Each shot carries its half, its shooter and where it ended (for the goal line).
+        let barkley = try #require(ucl.first { $0.outcome == .goal && $0.shooter == "Ross Barkley" })
+        #expect(barkley.period == 1)
+        #expect(barkley.end == .init(x: 1.0, y: 0.52))
     }
 
     @Test func collegeGamesCarryPollRanks() throws {

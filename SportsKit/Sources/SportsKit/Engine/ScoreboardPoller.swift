@@ -20,6 +20,8 @@ public final class ScoreboardPoller {
     private let date: Date?
     /// Called after each successful fetch with the previous and new games, for change detection.
     public var onUpdate: ((_ old: [Game], _ new: [Game]) -> Void)?
+    /// True while `games` is last launch's cached copy, so the first real fetch isn't compared against it.
+    private var showingCache = false
 
     public init(provider: any SportsProvider, leagues: [League], date: Date? = nil) {
         self.provider = provider
@@ -29,12 +31,27 @@ public final class ScoreboardPoller {
 
     /// Polls until the calling task is cancelled (run it from `.task`), or until a fixed day is all final.
     public func run() async {
+        await seedFromCache()
         var failures = 0
         while !Task.isCancelled {
             failures = await refresh() ? 0 : failures + 1
             guard let delay = Self.nextPoll(after: games, failures: failures, now: .now) ?? untilTomorrow() else { return }
             try? await Task.sleep(for: delay)
         }
+    }
+
+    /// Fills `games` from the provider's disk cache, so screens draw at once instead of waiting on the network.
+    public func seedFromCache() async {
+        guard games.isEmpty else { return }
+        // Counts as loading, so screens show their spinner rather than flash "No games".
+        isLoading = true
+        defer { isLoading = false }
+        let provider = provider, day = date ?? .now
+        var cached: [Game] = []
+        for league in leagues { cached += await provider.cachedScoreboard(league: league, date: day) }
+        guard games.isEmpty, !cached.isEmpty else { return }
+        games = cached.sorted { $0.startDate < $1.startDate }
+        showingCache = true
     }
 
     /// Fetches once. Returns false on a network or decoding error.
@@ -61,7 +78,9 @@ public final class ScoreboardPoller {
             }
             if !results.isEmpty, failures.count == results.count { throw failures[0] }
             let games = results.flatMap { (try? $0.get()) ?? [] }
-            let old = self.games
+            // Changes while the app was closed (a game going final) aren't news, so a cached start compares as a first load.
+            let old = showingCache ? [] : self.games
+            showingCache = false
             self.games = games.sorted { $0.startDate < $1.startDate }
             error = nil
             onUpdate?(old, self.games)

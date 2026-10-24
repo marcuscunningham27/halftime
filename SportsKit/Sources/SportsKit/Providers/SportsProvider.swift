@@ -5,6 +5,8 @@ public protocol SportsProvider: Sendable {
     func leagues() async throws -> [League]
     /// Games starting on `date`'s calendar day in the current time zone.
     func scoreboard(league: League, date: Date) async throws -> [Game]
+    /// Last launch's games for a day, without the network, so screens can draw before the first fetch.
+    func cachedScoreboard(league: League, date: Date) async -> [Game]
     /// The league's most recent final scores, newest first; empty when nothing finished lately.
     func recentResults(league: League, before date: Date) async throws -> [Game]
     /// The team's live game, else its next one, else its most recent; nil if the schedule is empty.
@@ -15,4 +17,9 @@ public protocol SportsProvider: Sendable {
     /// Takes the game rather than an ID because providers need its league to build the request.
     /// Plays come back inside the detail; red zone uses the scoreboard's live situation, so no separate plays(id:) call.
     func gameDetail(for game: Game) async throws -> GameDetail
+}
+
+extension SportsProvider {
+    /// Providers without a cache have nothing to show early.
+    public func cachedScoreboard(league: League, date: Date) async -> [Game] { [] }
 }

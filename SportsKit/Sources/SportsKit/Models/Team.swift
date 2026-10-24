@@ -24,3 +24,21 @@ public struct Team: Identifiable, Hashable, Sendable {
         self.logoURL = logoURL
     }
 }
+
+extension Team {
+    /// The colour behind the team's pages: its alternate when the main one has no colour in it (Spurs' white),
+    /// as long as the alternate is coloured or dark; otherwise the main colour.
+    public var backdropHex: String? {
+        guard let main = colorHex.flatMap(Self.rgb), main.saturation < 0.15,
+              let alternate = alternateColorHex.flatMap(Self.rgb), alternate.saturation >= 0.15 || alternate.brightness < 0.4
+        else { return colorHex }
+        return alternateColorHex
+    }
+
+    private static func rgb(_ hex: String) -> (saturation: Double, brightness: Double)? {
+        guard hex.count == 6, let value = UInt32(hex, radix: 16) else { return nil }
+        let parts = [value >> 16 & 0xFF, value >> 8 & 0xFF, value & 0xFF].map { Double($0) / 255 }
+        let top = parts.max()!, bottom = parts.min()!
+        return (top == 0 ? 0 : (top - bottom) / top, top)
+    }
+}

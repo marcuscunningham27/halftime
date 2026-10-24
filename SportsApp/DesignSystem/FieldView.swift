@@ -104,15 +104,15 @@ struct FieldView: View {
                 ZStack(alignment: .topLeading) {
                     // ESPN-style grass, mown in 10-yard stripes, end zones in team colours, yard lines every 10.
                     HStack(spacing: 0) {
-                        game.away.team.color.frame(width: width / 12)
+                        game.away.team.backdropColor.frame(width: width / 12)
                         ForEach(0..<10) { i in
                             (i.isMultiple(of: 2) ? Color.turfLight : Color.turfDark).frame(maxWidth: .infinity)
                         }
-                        game.home.team.color.frame(width: width / 12)
+                        game.home.team.backdropColor.frame(width: width / 12)
                     }
                     // Team names painted in the end zones, reading toward midfield like a real field.
-                    endZoneName(game.away.team.abbreviation, angle: -90).frame(width: width / 12, height: height)
-                    endZoneName(game.home.team.abbreviation, angle: 90).frame(width: width / 12, height: height)
+                    EndZoneName(name: game.away.team.abbreviation, angle: -90).frame(width: width / 12, height: height)
+                    EndZoneName(name: game.home.team.abbreviation, angle: 90).frame(width: width / 12, height: height)
                         .offset(x: width * 11 / 12)
                     ForEach(1..<10) { i in
                         Rectangle().fill(.white.opacity(i == 5 ? 0.55 : 0.25)).frame(width: 1, height: height)
@@ -143,9 +143,9 @@ struct FieldView: View {
             // The field's front edge, for ESPN's raised look.
             GeometryReader { geometry in
                 HStack(spacing: 0) {
-                    game.away.team.color.frame(width: geometry.size.width / 12)
+                    game.away.team.backdropColor.frame(width: geometry.size.width / 12)
                     Color.turfDark
-                    game.home.team.color.frame(width: geometry.size.width / 12)
+                    game.home.team.backdropColor.frame(width: geometry.size.width / 12)
                 }
             }
             .brightness(-0.25)
@@ -178,28 +178,12 @@ struct FieldView: View {
     /// DOWN | BALL ON | DRIVE, as ESPN's Gamecast heads the field.
     private var header: some View {
         HStack(spacing: 0) {
-            stat("Down", state.down)
+            GamecastStat(title: "Down", value: state.down)
             Divider().frame(height: 34)
-            stat("Ball On", state.ballOn)
+            GamecastStat(title: "Ball On", value: state.ballOn)
             Divider().frame(height: 34)
-            stat("Drive", state.drive)
+            GamecastStat(title: "Drive", value: state.drive)
         }
-    }
-
-    private func stat(_ title: String, _ value: String?) -> some View {
-        VStack(spacing: 2) {
-            Text(title + ":").font(.caption.weight(.medium)).foregroundStyle(.secondary).textCase(.uppercase)
-            Text(value ?? "–").font(.title3.weight(.medium)).lineLimit(1).minimumScaleFactor(0.7)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private func endZoneName(_ name: String, angle: Double) -> some View {
-        Text(name)
-            .font(.system(size: 13, weight: .heavy).width(.expanded))
-            .foregroundStyle(.white.opacity(0.9))
-            .fixedSize()
-            .rotationEffect(.degrees(angle))
     }
 
     /// Plays stack from the top of the field down, oldest first; the ball sits on the row after the last.
@@ -254,6 +238,34 @@ struct FieldView: View {
     /// Horizontal position of a spot measured from the home goal; the field is 120 units including end zones.
     private func x(_ yardsFromHomeGoal: Int, _ width: CGFloat) -> CGFloat {
         width * CGFloat(10 + (100 - yardsFromHomeGoal)) / 120
+    }
+}
+
+/// One figure in a game cast's info row, e.g. "DOWN: 3rd & 4" or "SHOTS: 11–13".
+struct GamecastStat: View {
+    let title: String
+    let value: String?
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Text(title + ":").font(.caption.weight(.medium)).foregroundStyle(.secondary).textCase(.uppercase)
+            Text(value ?? "–").font(.title3.weight(.medium)).lineLimit(1).minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+/// A team's code painted across its end of the field, reading toward the middle.
+struct EndZoneName: View {
+    let name: String
+    let angle: Double
+
+    var body: some View {
+        Text(name)
+            .font(.system(size: 13, weight: .heavy).width(.expanded))
+            .foregroundStyle(.white.opacity(0.9))
+            .fixedSize()
+            .rotationEffect(.degrees(angle))
     }
 }
 

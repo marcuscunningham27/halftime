@@ -14,15 +14,19 @@ struct GamecastView<Surface: View>: View {
     private var recent: [Play] {
         plays.filter { play in
             if game.leagueID == League.mlb.id { return play.type == "Play Result" }
-            return play.teamID != nil && !play.text.isEmpty && !["Substitution", "Stoppage"].contains(play.type) && !isMarker(play)
+            return play.teamID != nil && !play.text.isEmpty && !Self.skipped.contains(play.type ?? "")
+                && play.type != "Stoppage" && !isMarker(play)
         }
         .suffix(3).reversed()
     }
 
     /// The banner's play: the very latest, including timeouts and period or game ends.
     private var latest: Play? {
-        plays.last { !$0.text.isEmpty && $0.type != "Substitution" }
+        plays.last { !$0.text.isEmpty && !Self.skipped.contains($0.type ?? "") }
     }
+
+    /// Never banner- or list-worthy: line-up changes and soccer's injury delays.
+    private static var skipped: Set<String> { ["Substitution", "Start Delay", "End Delay"] }
 
     var body: some View {
         VStack(spacing: 12) {

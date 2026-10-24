@@ -17,11 +17,20 @@ public actor ESPNProvider: SportsProvider {
     }
 
     public func scoreboard(league: League, date: Date) async throws -> [Game] {
+        try await scoreboard(league: league, date: date, cachePolicy: .useProtocolCachePolicy)
+    }
+
+    /// The same request answered only from URLSession's disk cache (whatever was saved last launch), never the network.
+    public func cachedScoreboard(league: League, date: Date) async -> [Game] {
+        (try? await scoreboard(league: league, date: date, cachePolicy: .returnCacheDataDontLoad)) ?? []
+    }
+
+    private func scoreboard(league: League, date: Date, cachePolicy: URLRequest.CachePolicy) async throws -> [Game] {
         let path = try Self.path(for: league.id)
         let day = Calendar.current.dateInterval(of: .day, for: date)!
         var games: [Game] = []
         for espnDay in ESPNEndpoints.espnDays(covering: day) {
-            let data = try await fetch(ESPNEndpoints.scoreboard(path: path, espnDay: espnDay))
+            let data = try await fetch(URLRequest(url: ESPNEndpoints.scoreboard(path: path, espnDay: espnDay), cachePolicy: cachePolicy))
             games += try Self.parseScoreboard(data, leagueID: league.id)
         }
         return games.filter { $0.startDate >= day.start && $0.startDate < day.end }
@@ -201,7 +210,11 @@ public actor ESPNProvider: SportsProvider {
     }
 
     private func fetch(_ url: URL) async throws -> Data {
-        let (data, response) = try await session.data(from: url)
+        try await fetch(URLRequest(url: url))
+    }
+
+    private func fetch(_ request: URLRequest) async throws -> Data {
+        let (data, response) = try await session.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard status == 200 else { throw ESPNError.badStatus(status) }
         return data
@@ -277,6 +290,9 @@ public actor ESPNProvider: SportsProvider {
         let teamIDs = Dictionary((summary.rosters ?? []).compactMap { r in r.team.displayName.map { ($0, r.team.id) } },
                                  uniquingKeysWith: { first, _ in first })
         detail.shots = (summary.commentary ?? []).compactMap { $0.play?.shot(teamIDs: teamIDs) }
+        detail.periodScores = Dictionary((summary.header?.competitions?.first?.competitors ?? []).map { competitor in
+            (competitor.team.id, (competitor.linescores ?? []).compactMap { $0.displayValue.flatMap { Int($0) } })
+        }, uniquingKeysWith: { first, _ in first })
         return detail
     }
 
@@ -635,7 +651,14 @@ private struct SummaryDTO: Decodable {
                 struct MediaDTO: Decodable { let shortName: String? }
                 let media: MediaDTO?
             }
+            struct CompetitorDTO: Decodable {
+                struct TeamDTO: Decodable { let id: String }
+                struct LineScoreDTO: Decodable { let displayValue: String? }
+                let team: TeamDTO
+                let linescores: [LineScoreDTO]?
+            }
             let broadcasts: [BroadcastDTO]?
+            let competitors: [CompetitorDTO]?
         }
         let competitions: [CompetitionDTO]?
     }
@@ -796,14 +819,21 @@ private struct CommentaryDTO: Decodable {
         struct TypeDTO: Decodable { let type: String? }
         struct TeamDTO: Decodable { let displayName: String? }
         struct ClockDTO: Decodable { let displayValue: String? }
+        struct PeriodDTO: Decodable { let number: Int? }
+        struct ParticipantDTO: Decodable { struct Athlete: Decodable { let displayName: String? }; let athlete: Athlete? }
 
         let id: String
         let type: TypeDTO?
         let team: TeamDTO?
         let shortText: String?
         let clock: ClockDTO?
+        let period: PeriodDTO?
+        /// The shooter first, then any assister.
+        let participants: [ParticipantDTO]?
         let fieldPositionX: Double?
         let fieldPositionY: Double?
+        let fieldPosition2X: Double?
+        let fieldPosition2Y: Double?
 
         /// nil for anything that isn't an attempt on goal (own goals included) or has no spot.
         func shot(teamIDs: [String: Team.ID]) -> Shot? {
@@ -818,7 +848,9 @@ private struct CommentaryDTO: Decodable {
             guard let outcome, let x = fieldPositionX, let y = fieldPositionY,
                   let name = team?.displayName, let teamID = teamIDs[name] else { return nil }
             return Shot(id: id, teamID: teamID, outcome: outcome, location: .init(x: x / 100, y: y / 100),
-                        text: [shortText, clock?.displayValue].compactMap { $0 }.joined(separator: " · "))
+                        text: [shortText, clock?.displayValue].compactMap { $0 }.joined(separator: " · "),
+                        period: period?.number ?? 1, shooter: participants?.first?.athlete?.displayName,
+                        end: fieldPosition2X.flatMap { ex in fieldPosition2Y.map { .init(x: ex / 100, y: $0 / 100) } })
         }
     }
 
@@ -841,7 +873,8 @@ private struct RosterDTO: Decodable {
 
     struct TeamDTO: Decodable { let id: String; let displayName: String? }
 
-    static let columns = ["G", "A", "SHOT", "SOG", "FC", "FA", "YC", "RC"]
+    /// ESPN's stat abbreviations, and the labels shown for them (ESPN's website style).
+    static let columns = [("G", "G"), ("A", "A"), ("SHOT", "SH"), ("SOG", "ST"), ("FC", "FC"), ("FA", "FA"), ("YC", "YC"), ("RC", "RC")]
 
     let team: TeamDTO
     let roster: [PlayerDTO]?
@@ -851,13 +884,14 @@ private struct RosterDTO: Decodable {
         let played = (roster ?? []).filter { $0.starter == true } + (roster ?? []).filter { $0.starter != true && $0.subbedIn == true }
         guard !played.isEmpty else { return nil }
         return BoxScore(teamID: team.id, category: "players", title: "\(team.displayName ?? "") Players",
-                        labels: ["POS"] + Self.columns,
+                        labels: ["POS"] + Self.columns.map(\.1),
                         rows: played.map { player in
                             let stats = Dictionary((player.stats ?? []).compactMap { s in s.abbreviation.map { ($0, s.displayValue ?? "") } },
                                                    uniquingKeysWith: { first, _ in first })
                             return .init(id: player.athlete.id, name: player.athlete.displayName,
-                                         stats: [player.position?.abbreviation ?? ""] + Self.columns.map { stats[$0] ?? "0" })
-                        })
+                                         stats: [player.position?.abbreviation ?? ""] + Self.columns.map { stats[$0.0] ?? "0" })
+                        },
+                        key: "SH shots · ST on target · FC fouls committed · FA fouls won · YC/RC yellow/red cards")
     }
 }
 

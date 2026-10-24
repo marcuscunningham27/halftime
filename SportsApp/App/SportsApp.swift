@@ -12,6 +12,9 @@ struct SportsApp: App {
     @State private var liveScores: ScoreboardPoller
 
     init() {
+        // Room for every league's scoreboards (about 100 KB a day each) and game details, kept on disk
+        // so the next launch can draw last time's scores before the network answers.
+        URLCache.shared = URLCache(memoryCapacity: 20_000_000, diskCapacity: 200_000_000)
         let provider = ESPNProvider()
         self.provider = provider
         do {
