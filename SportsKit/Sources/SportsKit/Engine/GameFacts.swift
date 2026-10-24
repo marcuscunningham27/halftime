@@ -313,7 +313,7 @@ public struct QuickQuestion: Hashable, Sendable, Identifiable {
     /// Four questions that suit the sport's stats.
     public static func list(for leagueID: League.ID) -> [QuickQuestion] {
         switch leagueID {
-        case League.nfl.id: [
+        case League.nfl.id, League.cfb.id: [
             .init("Who had the most yards?", .leaders(["passing yards", "rushing yards", "receiving yards"])),
             .init("Who were the top passers?", .boxRows(anchor: "C/ATT", columns: ["C/ATT", "YDS", "TD", "INT"], firstOnly: false)),
             .init("How did turnovers change the game?", .teamStats(["Turnovers", "Fumbles lost", "Interceptions thrown"])),

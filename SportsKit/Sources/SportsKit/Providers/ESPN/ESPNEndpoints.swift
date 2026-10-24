@@ -7,6 +7,7 @@ enum ESPNEndpoints {
     /// League ID → ESPN "sport/league" path. Adding a league means adding a row.
     static let leaguePaths: [League.ID: String] = [
         League.nfl.id: "football/nfl",
+        League.cfb.id: "football/college-football",
         League.nba.id: "basketball/nba",
         League.wnba.id: "basketball/wnba",
         League.mlb.id: "baseball/mlb",
@@ -28,6 +29,10 @@ enum ESPNEndpoints {
             URLQueryItem(name: "dates", value: season), URLQueryItem(name: "seasontype", value: "2"),
             URLQueryItem(name: "week", value: String(week)), URLQueryItem(name: "limit", value: "100"),
         ])
+    }
+
+    static func rankings(path: String) -> URL {
+        base.appending(path: path).appending(path: "rankings")
     }
 
     /// Standings live under /apis/v2, not the site API. `level` 3 splits conferences into divisions.

@@ -62,6 +62,9 @@ public struct League: Identifiable, Hashable, Sendable {
 
     public static let nfl = League(id: "nfl", name: "National Football League", abbreviation: "NFL",
                                    closeGameMargin: 8, closeGameSeconds: 300)
+    /// AP Top 25 only: ESPN's default scoreboard is ranked teams' games, and search offers the poll's teams.
+    public static let cfb = League(id: "cfb", name: "College Football", abbreviation: "NCAAF",
+                                   closeGameMargin: 8, closeGameSeconds: 300)
     public static let nba = League(id: "nba", name: "National Basketball Association", abbreviation: "NBA",
                                    closeGameMargin: 5, closeGameSeconds: 120)
     public static let wnba = League(id: "wnba", name: "Women's National Basketball Association", abbreviation: "WNBA",
@@ -75,11 +78,12 @@ public struct League: Identifiable, Hashable, Sendable {
 
     /// Every league the app knows about, in sidebar order; providers say which ones they can serve.
     /// AFL and NRL were dropped (Oct 2026): ESPN's data for them is too thin. Follows of theirs are pruned on launch.
-    public static let all: [League] = [.nfl, .nba, .wnba, .mlb, .nhl, .epl, .ucl, .mls]
+    public static let all: [League] = [.nfl, .cfb, .nba, .wnba, .mlb, .nhl, .epl, .ucl, .mls]
 
     /// ESPN's league logo, for section headers. Soccer logos are filed under ESPN's numeric league IDs.
     public var logoURL: URL? {
         let soccer = [League.epl.id: 23, League.ucl.id: 2, League.mls.id: 19]
+        if id == League.cfb.id { return URL(string: "https://a.espncdn.com/redesign/assets/img/icons/NCAASports_Football.png") }
         return URL(string: soccer[id].map { "https://a.espncdn.com/i/leaguelogos/soccer/500/\($0).png" }
             ?? "https://a.espncdn.com/i/teamlogos/leagues/500/\(id).png")
     }

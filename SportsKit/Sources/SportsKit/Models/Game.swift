@@ -69,13 +69,19 @@ public struct Game: Identifiable, Hashable, Sendable {
         public let periodScores: [Int]
         /// Season record as the provider writes it, e.g. "5-2" or "7-3-1".
         public let record: String?
+        /// Poll rank (college football's AP Top 25); nil when unranked.
+        public let rank: Int?
 
-        public init(team: Team, score: Int?, periodScores: [Int], record: String? = nil) {
+        public init(team: Team, score: Int?, periodScores: [Int], record: String? = nil, rank: Int? = nil) {
             self.team = team
             self.score = score
             self.periodScores = periodScores
             self.record = record
+            self.rank = rank
         }
+
+        /// "#5 Georgia" when ranked, else just the short name.
+        public var rankedName: String { rank.map { "#\($0) \(team.shortName)" } ?? team.shortName }
     }
 
     public let id: String

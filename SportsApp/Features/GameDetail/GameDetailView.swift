@@ -133,7 +133,7 @@ struct GameHeader: View {
         }
     }
 
-    private var lineScoreInHeader: Bool { [League.nba.id, League.wnba.id, League.nfl.id, League.nhl.id, League.mlb.id].contains(game.leagueID) && game.status != .scheduled }
+    private var lineScoreInHeader: Bool { [League.nba.id, League.wnba.id, League.nfl.id, League.cfb.id, League.nhl.id, League.mlb.id].contains(game.leagueID) && game.status != .scheduled }
 
     private enum Direction { case left, right }
 
@@ -162,7 +162,7 @@ struct GameHeader: View {
             }
             TeamLogo(team: competitor.team, size: 48)
             HStack(spacing: 4) {
-                Text(competitor.team.shortName).font(.headline)
+                Text(competitor.rankedName).font(.headline)
                 FollowTeamButton(team: competitor.team, leagueID: game.leagueID)
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)

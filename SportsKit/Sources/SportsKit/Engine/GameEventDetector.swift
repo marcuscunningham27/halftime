@@ -29,8 +29,8 @@ public enum NotificationEvent: String, CaseIterable, Identifiable, Sendable {
 
     public func applies(to league: League) -> Bool {
         switch self {
-        case .redZone: league.id == League.nfl.id
-        case .closeGame: [League.nfl.id, League.nba.id, League.wnba.id, League.nhl.id].contains(league.id)
+        case .redZone: [League.nfl.id, League.cfb.id].contains(league.id)
+        case .closeGame: [League.nfl.id, League.cfb.id, League.nba.id, League.wnba.id, League.nhl.id].contains(league.id)
         // Innings and halves would spam or duplicate halftime.
         case .periodEnd: [.quarters, .periods].contains(league.periodStyle)
         case .halftime: [.quarters, .halves].contains(league.periodStyle)

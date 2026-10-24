@@ -66,7 +66,7 @@ struct GamecastView<Surface: View>: View {
     /// NFL teams get three timeouts a half, NBA teams seven a game, WNBA teams five.
     private var timeoutsPerGame: Int {
         switch game.leagueID {
-        case League.nfl.id: 3
+        case League.nfl.id, League.cfb.id: 3
         case League.wnba.id: 5
         default: 7
         }

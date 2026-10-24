@@ -97,8 +97,19 @@ public actor ESPNProvider: SportsProvider {
 
     public func standings(league: League) async throws -> Standings {
         let path = try Self.path(for: league.id)
+        // College football has conference tables; the app shows the AP poll instead, which also limits search to it.
+        if league == .cfb { return try Self.parseRankings(try await fetch(ESPNEndpoints.rankings(path: path))) }
         guard let spec = ESPNEndpoints.standingsSpecs[league.id] else { throw ESPNError.unsupportedLeague(league.id) }
         return try Self.parseStandings(try await fetch(ESPNEndpoints.standings(path: path, level: spec.level)), spec: spec)
+    }
+
+    /// The AP Top 25 as a one-table standings: record and poll points.
+    static func parseRankings(_ data: Data) throws -> Standings {
+        let polls = try JSONDecoder().decode(RankingsDTO.self, from: data).rankings
+        guard let ap = polls.first(where: { $0.type == "ap" }) ?? polls.first else { return Standings(columns: [], groups: []) }
+        return Standings(columns: ["REC", "PTS"], groups: [Standings.Group(name: ap.name ?? "AP Top 25", entries: ap.ranks.map { rank in
+            Standings.Entry(team: rank.team.team, values: [rank.recordSummary ?? "–", rank.points.map { String(Int($0)) } ?? "–"])
+        })])
     }
 
     static func parseStandings(_ data: Data, spec: ESPNEndpoints.StandingsSpec) throws -> Standings {
@@ -149,7 +160,7 @@ public actor ESPNProvider: SportsProvider {
     public func gameDetail(for game: Game) async throws -> GameDetail {
         let path = try Self.path(for: game.leagueID)
         var detail = try Self.parseSummary(try await fetch(ESPNEndpoints.summary(path: path, gameID: game.id)), leagueID: game.leagueID)
-        if [League.nba.id, League.wnba.id, League.nfl.id, League.nhl.id].contains(game.leagueID), game.status == .live {
+        if [League.nba.id, League.wnba.id, League.nfl.id, League.cfb.id, League.nhl.id].contains(game.leagueID), game.status == .live {
             // Optional extra: the court still draws without timeouts and fouls.
             detail.court = try? Self.parseCourtSituation(try await fetch(ESPNEndpoints.situation(path: path, gameID: game.id)))
         }
@@ -272,7 +283,10 @@ public actor ESPNProvider: SportsProvider {
     static func parseScoreboard(_ data: Data, leagueID: League.ID) throws -> [Game] {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = dateStrategy
-        return try decoder.decode(ScoreboardDTO.self, from: data).events.compactMap { $0.game(leagueID: leagueID) }
+        let games = try decoder.decode(ScoreboardDTO.self, from: data).events.compactMap { $0.game(leagueID: leagueID) }
+        // A dated college scoreboard is the full slate; the app only carries games with a Top 25 team.
+        guard leagueID == League.cfb.id else { return games }
+        return games.filter { $0.away.rank != nil || $0.home.rank != nil }
     }
 
     private static let dateStrategy = JSONDecoder.DateDecodingStrategy.custom { decoder in
@@ -486,6 +500,10 @@ private struct CompetitorDTO: Decodable {
     let linescores: [LineScoreDTO]?
     let records: [RecordDTO]?
     let team: TeamDTO
+    /// College poll rank; ESPN sends 99 for unranked teams.
+    let curatedRank: RankDTO?
+
+    struct RankDTO: Decodable { let current: Int? }
 
     func competitor(started: Bool) -> Game.Competitor {
         Game.Competitor(
@@ -493,7 +511,8 @@ private struct CompetitorDTO: Decodable {
             score: started ? score.flatMap { Int($0) } : nil,
             periodScores: (linescores ?? []).map { Int($0.value) },
             // ESPN lists the overall record first.
-            record: records?.first?.summary
+            record: records?.first?.summary,
+            rank: curatedRank?.current.flatMap { (1...25).contains($0) ? $0 : nil }
         )
     }
 }
@@ -511,6 +530,37 @@ private struct TeamDTO: Decodable {
         Team(id: id, abbreviation: abbreviation, displayName: displayName, shortName: shortDisplayName,
              colorHex: color, alternateColorHex: alternateColor, logoURL: logo)
     }
+}
+
+private struct RankingsDTO: Decodable {
+    struct PollDTO: Decodable {
+        struct RankDTO: Decodable {
+            struct TeamDTO: Decodable {
+                struct LogoDTO: Decodable { let href: URL? }
+                let id: String
+                let location: String
+                let name: String?
+                let abbreviation: String
+                let color: String?
+                let logos: [LogoDTO]?
+
+                var team: Team {
+                    Team(id: id, abbreviation: abbreviation, displayName: [location, name].compactMap { $0 }.joined(separator: " "),
+                         shortName: location, colorHex: color, alternateColorHex: nil, logoURL: logos?.first?.href)
+                }
+            }
+
+            let team: TeamDTO
+            let recordSummary: String?
+            let points: Double?
+        }
+
+        let name: String?
+        let type: String?
+        let ranks: [RankDTO]
+    }
+
+    let rankings: [PollDTO]
 }
 
 private struct TeamRefDTO: Decodable {

@@ -25,6 +25,8 @@ struct LeagueFixture: Sendable, CustomTestStringConvertible {
 }
 
 private let fixtures: [LeagueFixture] = [
+    .init(league: .cfb, games: 17, gameID: "401858274", status: .final, home: ("MIA", 52), away: ("PITT", 23),
+          compactPeriod: "Q4", plays: 186, scoringPlays: 12, teamStats: 15, boxScores: 20),
     .init(league: .nba, games: 12, gameID: "401898406", status: .final, home: ("ORL", 136), away: ("MIA", 115),
           compactPeriod: "Q4", plays: 515, scoringPlays: 131, teamStats: 25, boxScores: 2),
     .init(league: .wnba, games: 1, gameID: "401918307", status: .final, home: ("ATL", 97), away: ("GS", 71),
@@ -87,6 +89,31 @@ private let fixtures: [LeagueFixture] = [
         // Headers, volleys and penalties count as goals; the own goal isn't a shot.
         let ucl = try ESPNProvider.parseSummary(data("ucl-summary"), leagueID: League.ucl.id).shots
         #expect(ucl.filter { $0.outcome == .goal }.count == 3)
+    }
+
+    @Test func collegeGamesCarryPollRanks() throws {
+        let games = try ESPNProvider.parseScoreboard(data("cfb-scoreboard"), leagueID: League.cfb.id)
+        let game = try #require(games.first { $0.id == "401858274" })
+        #expect(game.home.rankedName == "#1 Miami")
+        // ESPN's 99 means unranked.
+        #expect(game.away.rank == nil)
+        #expect(game.away.rankedName == "Pitt")
+    }
+
+    @Test func datedCollegeScoreboardKeepsOnlyRankedTeamsGames() throws {
+        // ESPN sends all 44 games for a date; 17 have a Top 25 team.
+        let games = try ESPNProvider.parseScoreboard(data("cfb-scoreboard-day"), leagueID: League.cfb.id)
+        #expect(games.count == 17)
+        #expect(games.allSatisfy { $0.away.rank != nil || $0.home.rank != nil })
+    }
+
+    @Test func collegeStandingsAreTheAPPoll() throws {
+        let poll = try ESPNProvider.parseRankings(data("cfb-rankings"))
+        let table = try #require(poll.groups.first)
+        #expect(poll.groups.count == 1)
+        #expect(table.entries.count == 25)
+        #expect(table.entries.first?.team.displayName == "Miami Hurricanes")
+        #expect(table.entries.first?.values.first == "6-0")
     }
 
     @Test func everyKnownLeagueHasAnESPNMapping() async {
@@ -163,7 +190,8 @@ private let fixtures: [LeagueFixture] = [
     }
 
     @Test func everyLeagueHasAStandingsSpec() {
-        #expect(League.all.allSatisfy { ESPNEndpoints.standingsSpecs[$0.id] != nil })
+        // College football shows the AP poll instead (see collegeStandingsAreTheAPPoll).
+        #expect(League.all.filter { $0 != .cfb }.allSatisfy { ESPNEndpoints.standingsSpecs[$0.id] != nil })
     }
 }
 

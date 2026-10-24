@@ -118,7 +118,7 @@ struct ScoreCard: View {
                     Image(systemName: "star.fill").font(.system(size: 9)).offset(x: 8, y: -2)
                 }
             }
-            Text(competitor.team.shortName)
+            Text(competitor.rankedName)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)

@@ -52,7 +52,7 @@ struct FieldState {
     }
 
     init?(game: Game, detail: GameDetail?) {
-        guard game.league == .nfl else { return nil }
+        guard [.nfl, .cfb].contains(game.league) else { return nil }
         if game.status == .live, let situation = game.situation, let ball = situation.yardLine {
             self.ball = ball
             offenseTeamID = situation.possessionTeamID

@@ -9,7 +9,7 @@ struct PlaySurfaceView: View {
 
     var body: some View {
         switch game.leagueID {
-        case League.nfl.id:
+        case League.nfl.id, League.cfb.id:
             if let field = FieldState(game: game, detail: detail) {
                 GamecastView(game: game, plays: detail?.plays ?? [], court: detail?.court) {
                     FieldView(game: game, state: field)
