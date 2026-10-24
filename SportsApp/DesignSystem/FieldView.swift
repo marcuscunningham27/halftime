@@ -114,14 +114,29 @@ struct FieldView: View {
                     EndZoneName(name: game.away.team.abbreviation, angle: -90).frame(width: width / 12, height: height)
                     EndZoneName(name: game.home.team.abbreviation, angle: 90).frame(width: width / 12, height: height)
                         .offset(x: width * 11 / 12)
+                    // The NBA floor's light: brighter at the far left, falling off toward the near right.
+                    LinearGradient(colors: [.white.opacity(0.1), .clear, .black.opacity(0.12)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    Canvas { context, size in drawMarkings(in: &context, size: size) }
+                    // Yard numbers painted along both sidelines, the far row upside down as on a real field.
                     ForEach(1..<10) { i in
-                        Rectangle().fill(.white.opacity(i == 5 ? 0.55 : 0.25)).frame(width: 1, height: height)
-                            .offset(x: x(i * 10, width) - 0.5)
+                        let label = Text("\(min(i, 10 - i) * 10)").font(.system(size: 13, weight: .bold).monospacedDigit())
+                            .foregroundStyle(.white.opacity(0.6))
+                        label.position(x: x(i * 10, width), y: height - 16)
+                        label.rotationEffect(.degrees(180)).position(x: x(i * 10, width), y: 16)
                     }
                     // The home team's logo at midfield, under the drive.
-                    TeamLogo(team: game.home.team, size: height * 0.42)
+                    TeamLogo(team: game.home.team, size: height * 0.38)
                         .opacity(0.8)
                         .position(x: width / 2, y: height / 2)
+                    // While live, the offence's attacking side is shaded from the ball, as the NBA court shades its half.
+                    if game.status == .live, let offense = [game.away.team, game.home.team].first(where: { $0.id == state.offenseTeamID }) {
+                        PossessionOverlay(color: offense.color, towardLeft: offense.id == game.home.team.id,
+                                          from: x(state.ball, width) / width)
+                            .id(offense.id)
+                            .transition(.opacity)
+                    }
+                    // ESPN's lines: blue at the line of scrimmage, yellow at the line to gain.
+                    Rectangle().fill(Color(red: 0.25, green: 0.5, blue: 1)).frame(width: 2, height: height).offset(x: x(state.ball, width) - 1)
                     if let gain = state.lineToGain {
                         Rectangle().fill(.yellow).frame(width: 2, height: height).offset(x: x(gain, width) - 1)
                     }
@@ -135,11 +150,12 @@ struct FieldView: View {
                         .background { BallPulse(color: offenseColor) }
                         .position(x: x(state.ball, width), y: rowY(state.marks.count, height))
                 }
-                // The ball and line to gain slide to their new spots after each snap.
+                // The ball and lines slide to their new spots after each snap; possession fades across.
                 .animation(.spring(duration: 0.8), value: state.ball)
                 .animation(.spring(duration: 0.8), value: state.lineToGain)
+                .animation(.easeInOut(duration: 0.5), value: state.offenseTeamID)
             }
-            .frame(height: 120)
+            .frame(height: 170)
             // The field's front edge, for ESPN's raised look.
             GeometryReader { geometry in
                 HStack(spacing: 0) {
@@ -152,24 +168,13 @@ struct FieldView: View {
             .frame(height: 7)
             }
             .clipShape(.rect(cornerRadius: 8))
+            // The white boundary the NBA court has.
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.white.opacity(0.85), lineWidth: 1.5))
             .rotation3DEffect(.degrees(22), axis: (x: 1, y: 0, z: 0), perspective: 0.5)
             // Goalposts stand upright, so they sit outside the tilt, just behind each end line.
-            .overlay(alignment: .leading) { Goalpost().offset(x: 4, y: -40) }
-            .overlay(alignment: .trailing) { Goalpost().offset(x: -4, y: -40) }
+            .overlay(alignment: .leading) { Goalpost().offset(x: -4, y: -52) }
+            .overlay(alignment: .trailing) { Goalpost().scaleEffect(x: -1).offset(x: 4, y: -52) }
             .padding(.top, 28)
-
-            // ESPN's markers under the field: team, 20, 50, 20, team.
-            GeometryReader { geometry in
-                let width = geometry.size.width
-                ForEach([(10, game.home.team.abbreviation), (20, "20"), (50, "50"), (80, "20"), (110, game.away.team.abbreviation)], id: \.0) { yard, label in
-                    Text(label)
-                        .font(.caption.weight(.semibold).monospacedDigit())
-                        .foregroundStyle(yard == 10 || yard == 110 ? .primary : .secondary)
-                        .fixedSize()
-                        .position(x: x(yard == 10 ? -5 : yard == 110 ? 105 : yard, width), y: 7)
-                }
-            }
-            .frame(height: 14)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel([state.down, state.ballOn.map { "ball on \($0)" }, state.drive, state.lastPlay?.text].compactMap { $0 }.joined(separator: ", "))
@@ -183,6 +188,21 @@ struct FieldView: View {
             GamecastStat(title: "Ball On", value: state.ballOn)
             Divider().frame(height: 34)
             GamecastStat(title: "Drive", value: state.drive)
+        }
+    }
+
+    /// Yard lines every 5 (brighter every 10, brightest at midfield), and a tick each yard along both hash rows.
+    private func drawMarkings(in context: inout GraphicsContext, size: CGSize) {
+        for yard in stride(from: 5, through: 95, by: 5) {
+            let lineX = x(yard, size.width)
+            context.fill(Path(CGRect(x: lineX - 0.5, y: 0, width: 1, height: size.height)),
+                         with: .color(.white.opacity(yard == 50 ? 0.6 : yard.isMultiple(of: 10) ? 0.35 : 0.18)))
+        }
+        for yard in 1..<100 where !yard.isMultiple(of: 5) {
+            let tickX = x(yard, size.width)
+            for row in [0.36, 0.64] {
+                context.fill(Path(CGRect(x: tickX - 0.5, y: size.height * row - 2.5, width: 1, height: 5)), with: .color(.white.opacity(0.3)))
+            }
         }
     }
 
@@ -290,22 +310,29 @@ private struct BallPulse: View {
 }
 
 /// A yellow goalpost seen from the side of the field: post, crossbar and two uprights.
+/// ESPN's goalpost, drawn upright behind an end line: a dark stump, a gooseneck curving up into the middle of a
+/// crossbar seen at an angle, and two long parallel uprights, all in flat goalpost yellow. Faces right; mirror
+/// for the right-hand end.
 private struct Goalpost: View {
     var body: some View {
         Canvas { context, size in
-            let mid = size.width / 2, bar: CGFloat = 26
-            var path = Path()
-            path.move(to: CGPoint(x: mid, y: size.height))
-            path.addLine(to: CGPoint(x: mid, y: bar))
-            path.move(to: CGPoint(x: mid - 3, y: bar))
-            path.addLine(to: CGPoint(x: mid + 3, y: bar))
-            path.move(to: CGPoint(x: mid - 3, y: bar))
-            path.addLine(to: CGPoint(x: mid - 3, y: 0))
-            path.move(to: CGPoint(x: mid + 3, y: bar))
-            path.addLine(to: CGPoint(x: mid + 3, y: 0))
-            context.stroke(path, with: .color(Color(red: 0.98, green: 0.82, blue: 0.2)), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+            // Drawn on a 36 × 100 grid, scaled to the frame.
+            context.scaleBy(x: size.width / 36, y: size.height / 100)
+            let yellow = GraphicsContext.Shading.color(Color(red: 0.89, green: 0.79, blue: 0.25))
+            let near = CGPoint(x: 10, y: 66), far = CGPoint(x: 26, y: 54)
+            var post = Path()
+            // Gooseneck: up from the stump, then curving forward into the crossbar's middle.
+            post.move(to: CGPoint(x: 6, y: 90))
+            post.addLine(to: CGPoint(x: 6, y: 74))
+            post.addQuadCurve(to: CGPoint(x: (near.x + far.x) / 2, y: (near.y + far.y) / 2), control: CGPoint(x: 6, y: 62))
+            // Crossbar, then the two uprights.
+            post.move(to: near); post.addLine(to: far)
+            post.move(to: near); post.addLine(to: CGPoint(x: near.x, y: 12))
+            post.move(to: far); post.addLine(to: CGPoint(x: far.x, y: 0))
+            context.stroke(post, with: yellow, style: StrokeStyle(lineWidth: 3, lineCap: .butt, lineJoin: .round))
+            context.fill(Path(roundedRect: CGRect(x: 3, y: 86, width: 6, height: 14), cornerRadius: 2), with: .color(Color(white: 0.35)))
         }
-        .frame(width: 10, height: 64)
+        .frame(width: 36, height: 100)
         .accessibilityHidden(true)
     }
 }

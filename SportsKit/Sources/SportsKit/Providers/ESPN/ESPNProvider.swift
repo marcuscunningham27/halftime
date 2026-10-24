@@ -177,17 +177,18 @@ public actor ESPNProvider: SportsProvider {
     }
 
     /// ESPN core API's competition situation: timeouts left, fouls this period and bonus, per team.
-    /// Basketball nests timeouts in an object; football gives a plain number.
+    /// Football gives timeouts left as a plain number. Basketball nests them in an object whose
+    /// `timeoutsCurrent` counts timeouts used; the ones left are `timeoutsRemainingCurrent`.
     static func parseCourtSituation(_ data: Data) throws -> CourtSituation {
         struct DTO: Decodable {
             struct Timeouts: Decodable {
-                let timeoutsCurrent: Int?
+                let left: Int?
                 init(from decoder: Decoder) throws {
                     if let count = try? decoder.singleValueContainer().decode(Int.self) {
-                        timeoutsCurrent = count
+                        left = count
                     } else {
-                        enum Keys: CodingKey { case timeoutsCurrent }
-                        timeoutsCurrent = try decoder.container(keyedBy: Keys.self).decodeIfPresent(Int.self, forKey: .timeoutsCurrent)
+                        enum Keys: CodingKey { case timeoutsRemainingCurrent }
+                        left = try decoder.container(keyedBy: Keys.self).decodeIfPresent(Int.self, forKey: .timeoutsRemainingCurrent)
                     }
                 }
             }
@@ -197,7 +198,7 @@ public actor ESPNProvider: SportsProvider {
         }
         let dto = try JSONDecoder().decode(DTO.self, from: data)
         func side(_ timeouts: DTO.Timeouts?, _ fouls: DTO.Fouls?) -> CourtSituation.Side {
-            .init(timeoutsLeft: timeouts?.timeoutsCurrent, fouls: fouls?.teamFoulsCurrent,
+            .init(timeoutsLeft: timeouts?.left, fouls: fouls?.teamFoulsCurrent,
                   inBonus: (fouls?.bonusState).map { $0 != "NONE" } ?? false)
         }
         return CourtSituation(away: side(dto.awayTimeouts, dto.awayFouls), home: side(dto.homeTimeouts, dto.homeFouls),
@@ -955,8 +956,15 @@ private struct DrivesDTO: Decodable {
             let downDistanceText: String?
         }
 
+        /// College football wraps plays as "(09:07) … , End Of Play"; the clock is shown on its own, so both go.
+        private var cleanText: String {
+            (text ?? "")
+                .replacingOccurrences(of: #"^\(\d{1,2}:\d{2}\)\s*"#, with: "", options: .regularExpression)
+                .replacingOccurrences(of: #",?\s*End Of Play\.?$"#, with: "", options: [.regularExpression, .caseInsensitive])
+        }
+
         func play(teamID: Team.ID?, league: League.ID? = nil) -> Play {
-            Play(id: id, text: text ?? "", period: period?.number ?? 0, clock: clock?.displayValue ?? "",
+            Play(id: id, text: cleanText, period: period?.number ?? 0, clock: clock?.displayValue ?? "",
                  teamID: teamID ?? team?.id, isScoring: scoringPlay ?? false, awayScore: awayScore, homeScore: homeScore,
                  type: type?.text, spot: start?.downDistanceText, startYardLine: start?.yardLine, endYardLine: end?.yardLine,
                  location: location(league: league), isShot: shootingPlay ?? (hitCoordinate != nil), headline: shortDescription)

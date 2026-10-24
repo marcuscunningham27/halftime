@@ -54,10 +54,12 @@ private func detail(_ name: String) throws -> GameDetail {
 }
 
 @Test func courtSituationParsesTimeoutsFoulsAndBonus() throws {
-    let json = #"{"homeTimeouts":{"timeoutsCurrent":1,"timeoutsRemainingCurrent":0},"awayTimeouts":{"timeoutsCurrent":4},"homeFouls":{"teamFoulsCurrent":6,"bonusState":"DOUBLE"},"awayFouls":{"teamFoulsCurrent":2,"bonusState":"NONE"}}"#
+    // Heat at Hornets, 6:42 in the 1st, just after a Hornets timeout: basketball's timeoutsCurrent counts timeouts
+    // used, so what's left is timeoutsRemainingCurrent (Hornets 6 of 7, Heat all 7).
+    let json = #"{"homeTimeouts":{"timeoutsCurrent":1,"timeoutsRemainingCurrent":6},"awayTimeouts":{"timeoutsCurrent":0,"timeoutsRemainingCurrent":7},"homeFouls":{"teamFoulsCurrent":6,"bonusState":"DOUBLE"},"awayFouls":{"teamFoulsCurrent":2,"bonusState":"NONE"}}"#
     let court = try ESPNProvider.parseCourtSituation(Data(json.utf8))
-    #expect(court.home == .init(timeoutsLeft: 1, fouls: 6, inBonus: true))
-    #expect(court.away == .init(timeoutsLeft: 4, fouls: 2, inBonus: false))
+    #expect(court.home == .init(timeoutsLeft: 6, fouls: 6, inBonus: true))
+    #expect(court.away == .init(timeoutsLeft: 7, fouls: 2, inBonus: false))
     let football = try ESPNProvider.parseCourtSituation(Data(#"{"down":0,"homeTimeouts":2,"awayTimeouts":0}"#.utf8))
     #expect(football.home == .init(timeoutsLeft: 2, fouls: nil, inBonus: false))
     #expect(football.away.timeoutsLeft == 0)

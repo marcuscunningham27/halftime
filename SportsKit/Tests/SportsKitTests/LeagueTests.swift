@@ -118,6 +118,16 @@ private let fixtures: [LeagueFixture] = [
         #expect(games.allSatisfy { $0.away.rank != nil || $0.home.rank != nil })
     }
 
+    @Test func footballPlayTextDropsESPNClockAndFooter() throws {
+        // College plays read "(15:00) #22 J.Weinberg kickoff…", some ending ", End Of Play"; the clock is shown separately.
+        let plays = try ESPNProvider.parseSummary(data("cfb-summary"), leagueID: League.cfb.id).plays
+        #expect(plays.first?.text.hasPrefix("#22 J.Weinberg kickoff") == true)
+        #expect(!plays.contains { $0.text.hasPrefix("(1") || $0.text.hasPrefix("(0") || $0.text.hasSuffix("End Of Play") })
+        // The NFL's formation notes are part of the play and stay.
+        let nfl = try ESPNProvider.parseSummary(data("nfl-summary-final"), leagueID: League.nfl.id).plays
+        #expect(nfl.contains { $0.text.hasPrefix("(Shotgun)") })
+    }
+
     @Test func collegeStandingsAreTheAPPoll() throws {
         let poll = try ESPNProvider.parseRankings(data("cfb-rankings"))
         let table = try #require(poll.groups.first)

@@ -296,6 +296,9 @@ struct BasketballCourtView: View {
             .animation(.easeInOut(duration: 0.5), value: possession)
             .aspectRatio(94 / 50, contentMode: .fit)
             .rotation3DEffect(.degrees(20), axis: (x: 1, y: 0, z: 0), perspective: 0.5)
+            // Hoops stand up out of the floor, so they sit outside the tilt, over each basket.
+            .overlay(alignment: .leading) { Hoop(padColor: game.home.team.backdropColor).offset(x: -10, y: -34) }
+            .overlay(alignment: .trailing) { Hoop(padColor: game.home.team.backdropColor).scaleEffect(x: -1).offset(x: 10, y: -34) }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Shot chart. " + [game.away.team, game.home.team].map { "\($0.shortName) \(made($0)) of \(attempts($0))" }.joined(separator: ", "))
@@ -475,6 +478,58 @@ struct HockeyRinkView: View {
                 context.fill(Path(ellipseIn: CGRect(x: point.x - 1.8, y: point.y - 1.8, width: 3.6, height: 3.6)), with: .color(team.color.opacity(0.9)))
             }
         }
+    }
+}
+
+/// ESPN's basket behind a baseline: a padded stanchion box in the home team's colour (lit front, shaded side,
+/// pale top), a braced grey arm out to a backboard seen edge-on, a bracket, a red-orange rim and a
+/// cross-hatched net tapering below. Faces right; mirror for the right-hand end.
+private struct Hoop: View {
+    let padColor: Color
+
+    var body: some View {
+        Canvas { context, size in
+            // Drawn on a 50 × 100 grid, scaled to the frame.
+            context.scaleBy(x: size.width / 50, y: size.height / 100)
+            func fill(_ points: [CGPoint], _ color: Color) {
+                var path = Path(); path.addLines(points); path.closeSubpath()
+                context.fill(path, with: .color(color))
+            }
+            // Shadow on the floor, then the stanchion box: front, side and top faces.
+            context.fill(Path(ellipseIn: CGRect(x: 0, y: 95, width: 24, height: 5)), with: .color(.black.opacity(0.25)))
+            fill([CGPoint(x: 2, y: 50), CGPoint(x: 14, y: 46), CGPoint(x: 14, y: 98), CGPoint(x: 2, y: 98)], padColor)
+            fill([CGPoint(x: 14, y: 46), CGPoint(x: 19, y: 48), CGPoint(x: 19, y: 96), CGPoint(x: 14, y: 98)], padColor.mix(with: .black, by: 0.35))
+            fill([CGPoint(x: 2, y: 50), CGPoint(x: 14, y: 46), CGPoint(x: 19, y: 48), CGPoint(x: 7, y: 52)], padColor.mix(with: .white, by: 0.3))
+            // A seam across the pad, as on the real padding.
+            context.stroke(Path { $0.move(to: CGPoint(x: 2, y: 72)); $0.addLine(to: CGPoint(x: 14, y: 70)) },
+                           with: .color(.black.opacity(0.18)), lineWidth: 0.8)
+            // Arm out to the backboard, light on top and darker underneath, with a diagonal brace.
+            fill([CGPoint(x: 9, y: 47), CGPoint(x: 31, y: 39), CGPoint(x: 31, y: 42), CGPoint(x: 9, y: 50)], Color(white: 0.88))
+            fill([CGPoint(x: 9, y: 50), CGPoint(x: 31, y: 42), CGPoint(x: 31, y: 43.5), CGPoint(x: 9, y: 51.5)], Color(white: 0.62))
+            context.stroke(Path { $0.move(to: CGPoint(x: 17, y: 60)); $0.addLine(to: CGPoint(x: 30, y: 44)) },
+                           with: .color(Color(white: 0.7)), lineWidth: 1.5)
+            // Backboard, edge-on: a grey back edge and a white face, standing above the arm.
+            fill([CGPoint(x: 29, y: 8), CGPoint(x: 31, y: 7), CGPoint(x: 31, y: 47), CGPoint(x: 29, y: 48)], Color(white: 0.72))
+            fill([CGPoint(x: 31, y: 7), CGPoint(x: 35, y: 5), CGPoint(x: 35, y: 45), CGPoint(x: 31, y: 47)], .white)
+            // Bracket holding the rim off the board.
+            fill([CGPoint(x: 35, y: 40), CGPoint(x: 38, y: 40), CGPoint(x: 38, y: 43), CGPoint(x: 35, y: 44)], Color(white: 0.6))
+            // Net: strands tapering from the rim, cross-hatched, then the rim on top.
+            let rim = CGRect(x: 36, y: 39.5, width: 14, height: 5)
+            let topY = rim.midY, bottomY = rim.maxY + 11
+            let tops = (0...4).map { CGPoint(x: rim.minX + 1.5 + CGFloat($0) * 2.75, y: topY) }
+            let bottoms = (0...4).map { CGPoint(x: rim.midX - 3 + CGFloat($0) * 1.5, y: bottomY) }
+            var net = Path()
+            for (top, bottom) in zip(tops, bottoms) { net.move(to: top); net.addLine(to: bottom) }
+            for (index, top) in tops.enumerated() where index < 4 {
+                net.move(to: top); net.addLine(to: bottoms[index + 1])
+                net.move(to: tops[index + 1]); net.addLine(to: bottoms[index])
+            }
+            net.move(to: bottoms[0]); net.addLine(to: bottoms[4])
+            context.stroke(net, with: .color(Color(white: 0.85)), lineWidth: 0.6)
+            context.stroke(Path(ellipseIn: rim), with: .color(Color(red: 0.95, green: 0.33, blue: 0.15)), lineWidth: 1.6)
+        }
+        .frame(width: 34, height: 68)
+        .accessibilityHidden(true)
     }
 }
 

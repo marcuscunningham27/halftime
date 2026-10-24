@@ -251,32 +251,33 @@ private struct RecentPlayRow: View {
     }
 }
 
-/// The attacking half shaded in the team's colour, with chevrons running toward the basket.
+/// The attacking side shaded in the team's colour, with chevrons running toward the basket or end zone.
 struct PossessionOverlay: View {
     let color: Color
     let towardLeft: Bool
+    /// Where the shading and chevrons start, as a share of the width: centre court, or football's line of scrimmage.
+    var from: CGFloat = 0.5
 
     var body: some View {
         TimelineView(.animation) { timeline in
             Canvas { context, size in
-                let scale = size.width / 94
-                context.scaleBy(x: scale, y: scale)
-                let half = CGRect(x: towardLeft ? 0 : 47, y: 0, width: 47, height: 50)
-                context.fill(Path(half), with: .linearGradient(
+                let start = size.width * from, end: CGFloat = towardLeft ? 0 : size.width
+                let span = abs(end - start), dir: CGFloat = towardLeft ? -1 : 1, h = size.height
+                context.fill(Path(CGRect(x: min(start, end), y: 0, width: span, height: h)), with: .linearGradient(
                     Gradient(colors: [color.opacity(0.55), color.opacity(0.05)]),
-                    startPoint: CGPoint(x: towardLeft ? 0 : 94, y: 25), endPoint: CGPoint(x: 47, y: 25)))
-                // Three chevrons drifting from centre court to the arc, fading as they go.
+                    startPoint: CGPoint(x: end, y: h / 2), endPoint: CGPoint(x: start, y: h / 2)))
+                // Three chevrons drifting from the start toward the end, fading as they go; sized to the surface's
+                // height (on the 94 × 50 ft court: 3 ft wide, 14 ft tall, from 6 to 28 ft past half court).
                 let phase = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.6) / 1.6
-                let dir: CGFloat = towardLeft ? -1 : 1
                 for index in 0..<3 {
                     let t = (Double(index) / 3 + phase).truncatingRemainder(dividingBy: 1)
-                    let x = 47 + dir * (6 + t * 22)
+                    let x = start + dir * span * (6 + t * 22) / 47
                     var chevron = Path()
-                    chevron.move(to: CGPoint(x: x - dir * 3, y: 18))
-                    chevron.addLine(to: CGPoint(x: x + dir * 3, y: 25))
-                    chevron.addLine(to: CGPoint(x: x - dir * 3, y: 32))
+                    chevron.move(to: CGPoint(x: x - dir * h * 0.06, y: h * 0.36))
+                    chevron.addLine(to: CGPoint(x: x + dir * h * 0.06, y: h * 0.5))
+                    chevron.addLine(to: CGPoint(x: x - dir * h * 0.06, y: h * 0.64))
                     context.stroke(chevron, with: .color(.white.opacity(0.55 * sin(t * .pi))),
-                                   style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
+                                   style: StrokeStyle(lineWidth: h * 0.044, lineCap: .round, lineJoin: .round))
                 }
             }
         }
