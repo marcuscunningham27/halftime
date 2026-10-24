@@ -8,6 +8,8 @@ struct PlayMark: Hashable {
     let start: Int
     let end: Int
     let kind: Kind
+    /// The snap itself, for its yardage.
+    let play: Play
 
     /// Reads ESPN's play type; kicks, timeouts and period markers aren't drawn.
     init?(_ play: Play) {
@@ -23,6 +25,7 @@ struct PlayMark: Hashable {
         }
         self.start = start
         self.end = end
+        self.play = play
     }
 }
 
@@ -143,12 +146,31 @@ struct FieldView: View {
                     Canvas { context, size in
                         draw(in: &context, size: size)
                     }
-                    Image(systemName: "football.circle.fill")
-                        .font(.system(size: 16))
-                        .symbolRenderingMode(.palette)
-                        .foregroundStyle(.white, offenseColor)
-                        .background { BallPulse(color: offenseColor) }
-                        .position(x: x(state.ball, width), y: rowY(state.marks.count, height))
+                    // On the last play's row, so the pin stands on the end of its line with the yardage beneath, as ESPN does.
+                    let ball = CGPoint(x: x(state.ball, width), y: rowY(max(state.marks.count - 1, 0), height))
+                    if let mark = state.marks.last, let label = yardage(mark) {
+                        // ESPN's "+10 Yds" under the end of the last play.
+                        Text(label)
+                            .font(.caption.weight(.bold).monospacedDigit())
+                            .foregroundStyle(.black.opacity(0.8))
+                            .padding(.horizontal, 7).padding(.vertical, 2)
+                            .background(Color(white: 0.9), in: .rect(cornerRadius: 5))
+                            .fixedSize()
+                            .position(x: x(mark.end, width), y: rowY(state.marks.count - 1, height) + 15)
+                    }
+                    if let offense = [game.away.team, game.home.team].first(where: { $0.id == state.offenseTeamID }) {
+                        // The offence's logo in a pin whose point sits on the ball, as ESPN marks possession.
+                        Color.clear.frame(width: 12, height: 12).background { BallPulse(color: offense.color) }
+                            .position(ball)
+                        PossessionPin(team: offense).position(x: ball.x, y: ball.y - PossessionPin.height / 2)
+                    } else {
+                        Image(systemName: "football.circle.fill")
+                            .font(.system(size: 16))
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(.white, offenseColor)
+                            .background { BallPulse(color: offenseColor) }
+                            .position(ball)
+                    }
                 }
                 // The ball and lines slide to their new spots after each snap; possession fades across.
                 .animation(.spring(duration: 0.8), value: state.ball)
@@ -206,11 +228,11 @@ struct FieldView: View {
         }
     }
 
-    /// Plays stack from the top of the field down, oldest first; the ball sits on the row after the last.
+    /// Plays stack from the top of the field down, oldest first.
     private func rowY(_ index: Int, _ height: CGFloat) -> CGFloat {
-        let rows = max(state.marks.count + 1, 4)
-        // Room above the first row for its pass arc.
-        let top: CGFloat = 18, bottom: CGFloat = 8
+        let rows = max(state.marks.count, 4)
+        // Room above the first row for the possession pin (and any pass arc), and below the last for its yardage label.
+        let top = PossessionPin.height + 4, bottom: CGFloat = 28
         return top + (height - top - bottom) * CGFloat(index) / CGFloat(rows - 1)
     }
 
@@ -246,6 +268,13 @@ struct FieldView: View {
         }
     }
 
+    /// "+10 Yds", "−3 Yds", "No Gain" or "Incomplete" for a drawn play.
+    private func yardage(_ mark: PlayMark) -> String? {
+        if mark.kind == .incomplete { return "Incomplete" }
+        guard let yards = mark.play.yardsGained(homeOffense: state.offenseTeamID == game.home.team.id) else { return nil }
+        return yards == 0 ? "No Gain" : yards > 0 ? "+\(yards) Yds" : "−\(-yards) Yds"
+    }
+
     /// +1 when the offence moves right (the away team, toward the home goal), −1 when it moves left.
     private var direction: CGFloat {
         state.offenseTeamID == game.home.team.id ? -1 : 1
@@ -258,6 +287,34 @@ struct FieldView: View {
     /// Horizontal position of a spot measured from the home goal; the field is 120 units including end zones.
     private func x(_ yardsFromHomeGoal: Int, _ width: CGFloat) -> CGFloat {
         width * CGFloat(10 + (100 - yardsFromHomeGoal)) / 120
+    }
+}
+
+/// ESPN's possession marker: a white map pin with the offence's logo, its point on the ball.
+private struct PossessionPin: View {
+    static let height: CGFloat = 40
+    let team: Team
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            Pin().fill(.white).shadow(color: .black.opacity(0.3), radius: 2, y: 1)
+            Pin().stroke(.black.opacity(0.75), lineWidth: 1.5)
+            TeamLogo(team: team, size: 20).padding(.top, 6)
+        }
+        .frame(width: 32, height: Self.height)
+        .accessibilityHidden(true)
+    }
+}
+
+/// A circle on top narrowing to a point at the bottom. Shapes draw off the main actor.
+nonisolated private struct Pin: Shape {
+    func path(in rect: CGRect) -> Path {
+        let radius = rect.width / 2, center = CGPoint(x: rect.midX, y: radius)
+        var path = Path()
+        path.addArc(center: center, radius: radius, startAngle: .degrees(135), endAngle: .degrees(45), clockwise: false)
+        path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
+        path.closeSubpath()
+        return path
     }
 }
 

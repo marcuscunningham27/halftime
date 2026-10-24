@@ -202,3 +202,12 @@ public struct TeamStat: Identifiable, Hashable, Sendable {
         self.home = home
     }
 }
+
+extension Play {
+    /// Yards the offence moved on this snap, negative for a loss. Yard lines count from the home goal,
+    /// so the home offence gains as they rise and the away offence as they fall.
+    public func yardsGained(homeOffense: Bool) -> Int? {
+        guard let start = startYardLine, let end = endYardLine else { return nil }
+        return homeOffense ? end - start : start - end
+    }
+}
