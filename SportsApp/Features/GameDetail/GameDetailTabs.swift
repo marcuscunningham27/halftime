@@ -132,9 +132,9 @@ struct PlayRow: View {
         Group {
             if let spot = play.spot, let at = spot.range(of: " at ") {
                 let place = Text(spot[at.upperBound...]).foregroundStyle(color)
-                Text("\(play.clock) · \(String(spot[..<at.lowerBound])) at \(place)")
+                Text("\(play.clock.isEmpty ? "" : play.clock + " · ")\(String(spot[..<at.lowerBound])) at \(place)")
             } else if let spot = play.spot {
-                Text("\(play.clock) · \(spot)")
+                Text([play.clock, spot].filter { !$0.isEmpty }.joined(separator: " · "))
             } else {
                 Text(play.clock)
             }

@@ -234,7 +234,7 @@ public actor ESPNProvider: SportsProvider {
         let modelDrives = drives.map { drive in
             Drive(id: drive.id, teamID: drive.team?.id, summary: drive.description ?? "",
                   result: drive.displayResult, isScore: drive.isScore ?? false,
-                  plays: drive.plays.map { $0.play(teamID: drive.team?.id) })
+                  plays: drive.plays.map { $0.play(teamID: drive.team?.id, league: leagueID) })
         }
         if !drives.isEmpty {
             plays = modelDrives.flatMap(\.plays)
@@ -968,7 +968,9 @@ private struct DrivesDTO: Decodable {
         }
 
         func play(teamID: Team.ID?, league: League.ID? = nil) -> Play {
-            Play(id: id, text: cleanText, period: period?.number ?? 0, clock: clock?.displayValue ?? "",
+            // College overtime is untimed; ESPN stamps every snap 0:00, which reads as a clock that stopped.
+            let untimed = league == League.cfb.id && (period?.number ?? 0) > League.cfb.regulationPeriods
+            return Play(id: id, text: cleanText, period: period?.number ?? 0, clock: untimed ? "" : clock?.displayValue ?? "",
                  teamID: teamID ?? team?.id, isScoring: scoringPlay ?? false, awayScore: awayScore, homeScore: homeScore,
                  type: type?.text, spot: start?.downDistanceText, startYardLine: start?.yardLine, endYardLine: end?.yardLine,
                  location: location(league: league), isShot: shootingPlay ?? (hitCoordinate != nil), headline: shortDescription)

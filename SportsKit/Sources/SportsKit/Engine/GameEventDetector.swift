@@ -129,6 +129,11 @@ extension Game {
         League.with(id: leagueID) ?? League(id: leagueID, name: leagueID, abbreviation: leagueID.uppercased())
     }
 
+    /// False in college football's overtime, which is untimed possessions (ESPN parks the clock at 0:00).
+    public var showsGameClock: Bool {
+        !(leagueID == League.cfb.id && period > league.regulationPeriods)
+    }
+
     /// Short period for the menu bar: "Q3", "P2", "OT", "Half", or the provider's text where
     /// it says more than a number ("Top 8th", "67'").
     public var compactPeriod: String {

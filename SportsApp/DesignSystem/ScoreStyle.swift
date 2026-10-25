@@ -28,7 +28,7 @@ extension Game {
             switch league.periodStyle {
             case .quarters, .periods:
                 let period = self.period <= league.regulationPeriods ? Self.ordinal(self.period) : league.periodLabel(self.period)
-                return "\(period) \(clock)"
+                return showsGameClock ? "\(period) \(clock)" : period
             case .innings, .halves:
                 return statusDetail
             }
