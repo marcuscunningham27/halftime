@@ -1,11 +1,13 @@
 <script lang="ts">
 	// ScoreboardView.swift: a league (or, with ?team=, one team) for a chosen day in cards: live, upcoming, then results.
 	// On today it also shows recent results grouped by day, then the standings; Upcoming lists the games ahead.
-	// shortcut: no date picker field or follow button yet; Previous / Today / Next cover changing day.
+	// shortcut: no date picker field yet; Previous / Today / Next cover changing day.
 	import { page } from '$app/state';
 	import Backdrop from '$lib/Backdrop.svelte';
 	import GlassPicker from '$lib/GlassPicker.svelte';
 	import ScoreCard from '$lib/ScoreCard.svelte';
+	import FollowButton from '$lib/FollowButton.svelte';
+	import { isFollowingTeam } from '$lib/follows.svelte';
 	import { leagueByID, leagueLogo, scoreboard, recentResults, upcoming, standings as loadStandings, startOfDay, type Game, type Standings } from '$lib/espn';
 
 	const league = $derived(leagueByID(page.url.searchParams.get('league')));
@@ -113,6 +115,11 @@
 				<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
 			</button>
 		</div>
+		{#if teamID}
+			{#if team}<span class="glass round-wrap"><FollowButton leagueID={league.id} {team} name={team.shortName} glass /></span>{/if}
+		{:else}
+			<span class="glass round-wrap"><FollowButton leagueID={league.id} name={league.abbreviation} glass /></span>
+		{/if}
 		<button class="round glass" title="Refresh" aria-label="Refresh" onclick={() => ((aheadFor = undefined), refresh())}>
 			<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.5-3.55M13 2.5v3h-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
 		</button>
@@ -172,7 +179,10 @@
 								<tr>
 									<td class="rank">{i + 1}</td>
 									<td class="logo"><img src={entry.team.logo} alt="" width="22" height="22" /></td>
-									<td class="name"><a href={teamLink(entry.team.id)}>{entry.team.shortName}</a></td>
+									<td class="name">
+										<a href={teamLink(entry.team.id)}>{entry.team.shortName}</a>
+										{#if isFollowingTeam(league.id, entry.team.id)}<svg class="star" viewBox="0 0 20 20" width="9" height="9" role="img" aria-label="Following"><path d="M10 2.5l2.2 4.6 5 .6-3.7 3.5 1 5L10 13.8 5.5 16.2l1-5L2.8 7.7l5-.6z" fill="currentColor" /></svg>{/if}
+									</td>
 									{#each entry.values as v}<td class="num">{v}</td>{/each}
 								</tr>
 							{/each}
@@ -309,6 +319,14 @@
 	}
 	.logo {
 		width: 30px;
+	}
+	.round-wrap {
+		border-radius: 50%;
+		display: grid;
+	}
+	.star {
+		margin-left: 4px;
+		vertical-align: 1px;
 	}
 	.name a:hover {
 		text-decoration: underline;

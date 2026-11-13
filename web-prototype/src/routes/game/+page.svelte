@@ -10,6 +10,7 @@
 	import Gamecast from '$lib/Gamecast.svelte';
 	import Football from '$lib/Football.svelte';
 	import GlassPicker from '$lib/GlassPicker.svelte';
+	import FollowButton from '$lib/FollowButton.svelte';
 	import Overview from '$lib/tabs/Overview.svelte';
 	import TeamStats from '$lib/tabs/TeamStats.svelte';
 	import PlayByPlay from '$lib/tabs/PlayByPlay.svelte';
@@ -89,7 +90,10 @@
 			{#if hasBall(game!, c)}<Football />{/if}
 		</div>
 		<img src={c.team.logo} alt="" width="48" height="48" />
-		<a class="team-name" href="/league?league={league.id}&team={c.team.id}"><strong>{c.team.shortName}</strong></a>
+		<span class="team-line">
+			<a class="team-name" href="/league?league={league.id}&team={c.team.id}"><strong>{c.team.shortName}</strong></a>
+			<FollowButton leagueID={league.id} team={c.team} name={c.team.shortName} />
+		</span>
 		{#if c.record}<span class="secondary">{c.record}</span>{/if}
 	</div>
 {/snippet}
@@ -226,6 +230,11 @@
 	}
 	.digits {
 		font: 700 72px/1 'Chakra Petch', sans-serif;
+	}
+	.team-line {
+		display: flex;
+		align-items: center;
+		gap: 2px;
 	}
 	.team-name:hover {
 		text-decoration: underline;

@@ -1,12 +1,12 @@
 // Ported from SportsKit's ESPN provider: the same unofficial endpoints, trimmed to what Home and the NFL page need.
 
-export type League = { id: string; abbreviation: string; path: string; regulationPeriods: number; periodStyle: 'quarters' | 'periods' | 'halves' };
+export type League = { id: string; name: string; abbreviation: string; path: string; regulationPeriods: number; periodStyle: 'quarters' | 'periods' | 'halves' };
 
 export const leagues: League[] = [
-	{ id: 'nfl', abbreviation: 'NFL', path: 'football/nfl', regulationPeriods: 4, periodStyle: 'quarters' },
-	{ id: 'nba', abbreviation: 'NBA', path: 'basketball/nba', regulationPeriods: 4, periodStyle: 'quarters' },
-	{ id: 'nhl', abbreviation: 'NHL', path: 'hockey/nhl', regulationPeriods: 3, periodStyle: 'periods' },
-	{ id: 'epl', abbreviation: 'EPL', path: 'soccer/eng.1', regulationPeriods: 2, periodStyle: 'halves' }
+	{ id: 'nfl', name: 'National Football League', abbreviation: 'NFL', path: 'football/nfl', regulationPeriods: 4, periodStyle: 'quarters' },
+	{ id: 'nba', name: 'National Basketball Association', abbreviation: 'NBA', path: 'basketball/nba', regulationPeriods: 4, periodStyle: 'quarters' },
+	{ id: 'nhl', name: 'National Hockey League', abbreviation: 'NHL', path: 'hockey/nhl', regulationPeriods: 3, periodStyle: 'periods' },
+	{ id: 'epl', name: 'Premier League', abbreviation: 'EPL', path: 'soccer/eng.1', regulationPeriods: 2, periodStyle: 'halves' }
 ];
 
 /** Soccer league logos live under ESPN's numeric league IDs (League.logoURL). */
@@ -588,4 +588,12 @@ export async function upcoming(league: League, days: number): Promise<Game[]> {
 	const pages = await Promise.all(Array.from({ length: days }, (_, i) => scoreboard(league, startOfDay(i + 1)).catch(() => [])));
 	const seen = new Set<string>();
 	return pages.flat().filter((g) => g.status === 'scheduled' && !seen.has(g.id) && seen.add(g.id)).sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+}
+
+/** Every team, from each league's standings, for search; loaded once, the first time someone searches. */
+let teamsPromise: Promise<{ league: League; team: Team }[]> | undefined;
+export function allTeams() {
+	teamsPromise ??= Promise.all(leagues.map((l) => standings(l).then((s) => s.groups.flatMap((g) => g.entries.map((e) => ({ league: l, team: e.team })))).catch(() => [])))
+		.then((all) => all.flat().sort((a, b) => a.team.displayName.localeCompare(b.team.displayName)));
+	return teamsPromise;
 }

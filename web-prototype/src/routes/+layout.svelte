@@ -1,6 +1,9 @@
 <script lang="ts">
+	// ContentView.swift's sidebar: Home and Fantasy, search, followed leagues then teams, every league, Settings.
 	import { page } from '$app/state';
-	import { leagues, leagueLogo } from '$lib/espn';
+	import { leagues, leagueLogo, allTeams, type League, type Team } from '$lib/espn';
+	import { follows } from '$lib/follows.svelte';
+	import FollowButton from '$lib/FollowButton.svelte';
 	let { children } = $props();
 	// In the Tauri window the title bar is transparent, so the sidebar leaves room for the traffic lights.
 	const inTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -8,32 +11,89 @@
 		{ href: '/', title: 'Home', icon: 'M3 8.5 10 3l7 5.5V17h-4.5v-5h-5v5H3z' },
 		{ href: '/fantasy', title: 'Fantasy', icon: 'M10 2.5l2.2 4.6 5 .6-3.7 3.5 1 5L10 13.8 5.5 16.2l1-5L2.8 7.7l5-.6z' }
 	];
-	// A game page belongs to Home; a team page to its league.
-	const current = $derived(
-		page.url.pathname.startsWith('/fantasy') ? '/fantasy'
-		: page.url.pathname.startsWith('/league') ? `/league?league=${page.url.searchParams.get('league')}`
-		: '/'
-	);
-	// shortcut: lists every league until following lands; the Swift sidebar shows followed leagues and teams.
-	const leagueItems = leagues.map((l) => ({ href: `/league?league=${l.id}`, title: l.abbreviation, logo: leagueLogo(l) }));
+	// A game page belongs to Home; a team page is its own row when followed, else its league's.
+	const current = $derived.by(() => {
+		const path = page.url.pathname, q = page.url.searchParams;
+		if (path.startsWith('/fantasy')) return '/fantasy';
+		if (path.startsWith('/settings')) return '/settings';
+		if (path.startsWith('/league')) return q.get('team') ? `/league?league=${q.get('league')}&team=${q.get('team')}` : `/league?league=${q.get('league')}`;
+		return '/';
+	});
+	const leagueHref = (id: string) => `/league?league=${id}`;
+	const teamHref = (leagueID: string, teamID: string) => `/league?league=${leagueID}&team=${teamID}`;
+	const leagueOf = (id: string) => leagues.find((l) => l.id === id);
+
+	let query = $state('');
+	let teams = $state<{ league: League; team: Team }[]>([]);
+	const text = $derived(query.trim().toLowerCase());
+	$effect(() => {
+		if (text && teams.length === 0) allTeams().then((t) => (teams = t));
+	});
+	const matchingLeagues = $derived(leagues.filter((l) => l.abbreviation.toLowerCase().includes(text) || l.name.toLowerCase().includes(text)));
+	const matchingTeams = $derived(teams.filter(({ team }) => team.displayName.toLowerCase().includes(text) || team.abbreviation.toLowerCase() === text));
+	// Leaving for another page clears the search.
+	$effect(() => {
+		page.url.href;
+		query = '';
+	});
 </script>
 
 <div class="app" class:tauri={inTauri}>
 	<!-- The macOS 26 sidebar: a floating glass panel inset from the window edge, over the page's colour. -->
 	<nav class="sidebar glass" data-tauri-drag-region>
-		{#each items as item}
-			<a href={item.href} class:on={current === item.href} aria-current={current === item.href ? 'page' : undefined}>
-				<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d={item.icon} fill="currentColor" /></svg>
-				{item.title}
-			</a>
-		{/each}
-		<hr />
-		{#each leagueItems as item}
-			<a href={item.href} class:on={current === item.href} aria-current={current === item.href ? 'page' : undefined}>
-				<img src={item.logo} alt="" width="16" height="16" />
-				{item.title}
-			</a>
-		{/each}
+		<div class="rows">
+			{#each items as item}
+				<a class="main" href={item.href} class:on={current === item.href} aria-current={current === item.href ? 'page' : undefined}>
+					<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d={item.icon} fill="currentColor" /></svg>
+					{item.title}
+				</a>
+			{/each}
+			<label class="search glass">
+				<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.6" /><path d="M10.5 10.5 14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
+				<input bind:value={query} placeholder="Search teams and leagues" aria-label="Search teams and leagues" spellcheck="false" autocomplete="off" />
+				{#if query}<button class="clear" aria-label="Clear" onclick={() => (query = '')}>×</button>{/if}
+			</label>
+
+			{#if text}
+				<!-- Leagues and teams whose names match, each with a star to follow it. -->
+				{#if matchingLeagues.length}
+					<span class="section">Leagues</span>
+					{#each matchingLeagues as l}
+						<a href={leagueHref(l.id)}><img src={leagueLogo(l)} alt="" width="16" height="16" /><span class="grow">{l.name}</span><FollowButton leagueID={l.id} name={l.abbreviation} /></a>
+					{/each}
+				{/if}
+				<span class="section">Teams</span>
+				{#if matchingTeams.length === 0}<span class="note">{teams.length ? 'No matching teams' : 'Loading teams…'}</span>{/if}
+				{#each matchingTeams.slice(0, 30) as { league, team } (league.id + team.id)}
+					<a href={teamHref(league.id, team.id)}>
+						<img src={team.logo} alt="" width="16" height="16" />
+						<span class="grow two"><span>{team.displayName}</span><small>{league.abbreviation}</small></span>
+						<FollowButton leagueID={league.id} {team} name={team.shortName} />
+					</a>
+				{/each}
+			{:else}
+				<span class="section">Following</span>
+				{#if follows.leagues.length === 0 && follows.teams.length === 0}<span class="note">Nothing followed yet</span>{/if}
+				{#each follows.leagues as id (id)}
+					{@const l = leagueOf(id)}
+					{#if l}
+						<a href={leagueHref(id)} class:on={current === leagueHref(id)}><img src={leagueLogo(l)} alt="" width="16" height="16" />{l.abbreviation}</a>
+					{/if}
+				{/each}
+				{#if follows.leagues.length && follows.teams.length}<hr />{/if}
+				{#each follows.teams as { leagueID, team } (leagueID + team.id)}
+					<a href={teamHref(leagueID, team.id)} class:on={current === teamHref(leagueID, team.id)}><img src={team.logo} alt="" width="16" height="16" />{team.displayName}</a>
+				{/each}
+				<span class="section">Leagues</span>
+				{#each leagues as l}
+					<a href={leagueHref(l.id)} class:on={current === leagueHref(l.id)}><img src={leagueLogo(l)} alt="" width="16" height="16" />{l.abbreviation}</a>
+				{/each}
+			{/if}
+		</div>
+		<a class="settings" href="/settings" class:on={current === '/settings'}>
+			<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M10 6.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zm7 4.6v-2.2l-2-.4a5 5 0 0 0-.6-1.4l1.1-1.7-1.5-1.5-1.7 1.1a5 5 0 0 0-1.4-.6L10.5 2h-2.2l-.4 2a5 5 0 0 0-1.4.6L4.8 3.5 3.3 5l1.1 1.7a5 5 0 0 0-.6 1.4L2 8.9v2.2l2 .4c.1.5.3 1 .6 1.4l-1.1 1.7 1.5 1.5 1.7-1.1c.4.3.9.5 1.4.6l.4 2h2.2l.4-2c.5-.1 1-.3 1.4-.6l1.7 1.1 1.5-1.5-1.1-1.7c.3-.4.5-.9.6-1.4z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" /></svg>
+			Settings
+		</a>
 	</nav>
 	<div class="content">{@render children()}</div>
 </div>
@@ -147,6 +207,75 @@
 	.tauri .sidebar {
 		padding-top: 54px;
 	}
+	.rows {
+		flex: 1;
+		min-height: 0;
+		overflow-y: auto;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		scrollbar-width: none;
+	}
+	.section {
+		margin: 10px 10px 2px;
+		font-size: var(--caption);
+		font-weight: 600;
+		color: var(--secondary);
+	}
+	.note {
+		padding: 4px 10px;
+		color: var(--secondary);
+	}
+	.grow {
+		flex: 1;
+		min-width: 0;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.two {
+		display: flex;
+		flex-direction: column;
+	}
+	.two small {
+		font-size: var(--caption);
+		color: var(--secondary);
+	}
+	.search {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		margin: 6px 2px 2px;
+		padding: 4px 8px;
+		border-radius: 999px;
+		color: var(--secondary);
+	}
+	.search input {
+		flex: 1;
+		min-width: 0;
+		background: none;
+		border: 0;
+		outline: none;
+		font: inherit;
+		color: var(--label);
+		user-select: text;
+		-webkit-user-select: text;
+	}
+	.search:focus-within {
+		outline: 3px solid rgba(10, 132, 255, 0.55);
+	}
+	.clear {
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		background: var(--tertiary);
+		color: #000;
+		font-size: 12px;
+		line-height: 16px;
+	}
+	.settings {
+		margin-top: 6px;
+	}
 	.sidebar a {
 		display: flex;
 		align-items: center;
@@ -194,8 +323,15 @@
 		.app {
 			--sidebar: 0px;
 		}
-		.sidebar hr {
+		.rows {
+			flex-direction: row;
+			overflow: visible;
+		}
+		.rows > :not(.main) {
 			display: none;
+		}
+		.settings {
+			margin-top: 0;
 		}
 		.sidebar {
 			top: auto;
