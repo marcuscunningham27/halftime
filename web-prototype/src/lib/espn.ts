@@ -15,7 +15,7 @@ export const leagueLogo = (l: League) =>
 
 export type Team = { id: string; abbreviation: string; displayName: string; shortName: string; color?: string; alternateColor?: string; logo?: string };
 export type Competitor = { team: Team; score?: number; record?: string; periodScores: number[] };
-export type Situation = { possessionTeamID?: string; yardLine?: number; distance?: number; shortDownAndDistance?: string };
+export type Situation = { possessionTeamID?: string; yardLine?: number; distance?: number; shortDownAndDistance?: string; isRedZone?: boolean; downAndDistance?: string };
 export type Status = 'scheduled' | 'live' | 'final';
 export type Game = {
 	id: string;
@@ -108,6 +108,8 @@ function parseEvent(e: any, league: League): Game {
 		away: competitor('away'),
 		situation: s && {
 			possessionTeamID: s.possession,
+			isRedZone: s.isRedZone ?? false,
+			downAndDistance: s.downDistanceText,
 			yardLine: s.yardLine,
 			distance: s.distance,
 			shortDownAndDistance: s.shortDownDistanceText && (s.possessionText ? `${s.shortDownDistanceText} · ${s.possessionText}` : s.shortDownDistanceText)

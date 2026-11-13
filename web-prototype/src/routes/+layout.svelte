@@ -4,6 +4,7 @@
 	import { leagues, leagueLogo, allTeams, type League, type Team } from '$lib/espn';
 	import { follows } from '$lib/follows.svelte';
 	import FollowButton from '$lib/FollowButton.svelte';
+	import { startLive, refreshLive } from '$lib/live';
 	let { children } = $props();
 	// In the Tauri window the title bar is transparent, so the sidebar leaves room for the traffic lights.
 	const inTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -31,6 +32,14 @@
 	});
 	const matchingLeagues = $derived(leagues.filter((l) => l.abbreviation.toLowerCase().includes(text) || l.name.toLowerCase().includes(text)));
 	const matchingTeams = $derived(teams.filter(({ team }) => team.displayName.toLowerCase().includes(text) || team.abbreviation.toLowerCase() === text));
+	// The desktop app's menu-bar item and alerts run for as long as the app does; a new star updates the tray at once.
+	$effect(() => {
+		if (inTauri) startLive();
+	});
+	$effect(() => {
+		JSON.stringify(follows);
+		if (inTauri) refreshLive();
+	});
 	// Leaving for another page clears the search.
 	$effect(() => {
 		page.url.href;
