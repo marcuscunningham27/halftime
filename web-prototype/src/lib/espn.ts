@@ -205,7 +205,7 @@ export type Overview = {
 	leaders: Leader[];
 	recap?: { headline: string; paragraphs: string[] };
 };
-export type GameDetail = { plays: Play[]; drives: Drive[]; periodScores: Record<string, number[]>; boxScores: BoxScore[]; teamStats: TeamStat[]; overview: Overview };
+export type GameDetail = { plays: Play[]; shots: Shot[]; drives: Drive[]; periodScores: Record<string, number[]>; boxScores: BoxScore[]; teamStats: TeamStat[]; overview: Overview };
 
 export async function summary(game: Game): Promise<GameDetail> {
 	const s = await get(`${base}${game.league.path}/summary?event=${game.id}`);
@@ -237,6 +237,7 @@ export async function summary(game: Game): Promise<GameDetail> {
 	}
 	return {
 		plays,
+		shots: shots(s),
 		drives: modelDrives,
 		periodScores: Object.fromEntries(
 			(s.header?.competitions?.[0]?.competitors ?? []).map((c: any) => [c.team.id, (c.linescores ?? []).map((l: any) => Number(l.displayValue)).filter((n: number) => !isNaN(n))])
@@ -272,10 +273,49 @@ function parsePlay(p: any, league: League, teamID?: string): Play {
 		endYardLine: p.end?.yardLine,
 		period: p.period?.number ?? 0,
 		clock: p.clock?.displayValue ?? '',
-		// NBA coordinates are feet on a half court (50 wide, 47 deep); off-court values are ESPN's "unknown".
-		location: league.id === 'nba' && c && c.x >= 0 && c.x <= 50 && c.y >= 0 && c.y <= 47 ? { x: c.x / 50, y: c.y / 47 } : undefined,
+		location: location(league, c),
 		isShot: p.shootingPlay ?? false
 	};
+}
+
+/** A play's spot as 0–1 of the surface; off-surface values are ESPN's "unknown". */
+function location(league: League, c: any): Play['location'] {
+	if (!c || typeof c.x !== 'number' || typeof c.y !== 'number') return;
+	// NBA: feet on a half court (50 wide, 47 deep).
+	if (league.id === 'nba' && c.x >= 0 && c.x <= 50 && c.y >= 0 && c.y <= 47) return { x: c.x / 50, y: c.y / 47 };
+	// NHL: feet from centre ice on the 200 × 85 rink.
+	if (league.id === 'nhl' && Math.abs(c.x) <= 100 && Math.abs(c.y) <= 42.5) return { x: (c.x + 100) / 200, y: (42.5 - c.y) / 85 };
+}
+
+export type ShotOutcome = 'goal' | 'save' | 'offTarget' | 'block';
+/** A soccer attempt, in the shooting team's frame: x toward the goal it attacks, y across. */
+export type Shot = { id: string; teamID: string; outcome: ShotOutcome; location: { x: number; y: number }; end?: { x: number; y: number }; text: string; period: number; shooter?: string };
+
+/** Soccer shots come from the commentary, which names teams but gives no IDs, so match them through the line-ups. */
+function shots(s: any): Shot[] {
+	const teamIDs = new Map<string, string>((s.rosters ?? []).map((r: any) => [r.team?.displayName, r.team?.id]));
+	return (s.commentary ?? []).flatMap((entry: any) => {
+		const p = entry.play;
+		const kind: string = p?.type?.type ?? '';
+		const outcome: ShotOutcome | undefined =
+			kind.startsWith('goal') || kind === 'penalty---scored' ? 'goal'
+			: kind === 'shot-on-target' || kind === 'penalty---saved' ? 'save'
+			: kind === 'shot-off-target' || kind === 'penalty---missed' ? 'offTarget'
+			: kind === 'shot-blocked' ? 'block'
+			: undefined;
+		const teamID = teamIDs.get(p?.team?.displayName);
+		if (!outcome || !teamID || p.fieldPositionX === undefined || p.fieldPositionY === undefined) return [];
+		return [{
+			id: p.id,
+			teamID,
+			outcome,
+			location: { x: p.fieldPositionX / 100, y: p.fieldPositionY / 100 },
+			end: p.fieldPosition2X !== undefined && p.fieldPosition2Y !== undefined ? { x: p.fieldPosition2X / 100, y: p.fieldPosition2Y / 100 } : undefined,
+			text: [p.shortText, p.clock?.displayValue].filter(Boolean).join(' · '),
+			period: p.period?.number ?? 1,
+			shooter: p.participants?.[0]?.athlete?.displayName
+		}];
+	});
 }
 
 /** Both teams list the same stats in the same order. */

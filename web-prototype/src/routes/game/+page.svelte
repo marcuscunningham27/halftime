@@ -5,6 +5,8 @@
 	import Backdrop from '$lib/Backdrop.svelte';
 	import FieldView from '$lib/FieldView.svelte';
 	import Court from '$lib/Court.svelte';
+	import Rink from '$lib/Rink.svelte';
+	import Pitch from '$lib/Pitch.svelte';
 	import Gamecast from '$lib/Gamecast.svelte';
 	import Football from '$lib/Football.svelte';
 	import GlassPicker from '$lib/GlassPicker.svelte';
@@ -56,9 +58,14 @@
 
 	const field = $derived(football && game ? fieldState(game, drives) : undefined);
 	const plays = $derived(detail?.plays ?? []);
-	/** Located shots, without free throws (they all come from the same spot). */
-	const shots = $derived(league.id === 'nba' ? plays.filter((p) => p.location && p.isShot && !/free throw/i.test(p.type ?? '')) : []);
-	const showCourt = $derived(league.id === 'nba' && game && (game.status === 'live' || shots.length > 0));
+	/** Located shots: basketball without free throws (they all come from the same spot), hockey shots and goals. */
+	const shots = $derived(
+		league.id === 'nba' ? plays.filter((p) => p.location && p.isShot && !/free throw/i.test(p.type ?? ''))
+		: league.id === 'nhl' ? plays.filter((p) => p.location && /shot|goal/i.test(p.type ?? ''))
+		: []
+	);
+	// A surface shows while live, or afterwards when there's something to draw on it.
+	const hasSurface = $derived(game?.status === 'live' || shots.length > 0 || (detail?.shots.length ?? 0) > 0);
 	const ballWith = $derived(game?.status === 'live' ? possession(plays, game.away.team.id, game.home.team.id) : undefined);
 </script>
 
@@ -119,8 +126,12 @@
 
 		{#if field}
 			<Gamecast {game} {plays}><FieldView {game} {field} /></Gamecast>
-		{:else if showCourt}
+		{:else if hasSurface && league.id === 'nba'}
 			<Gamecast {game} {plays}><Court {game} {shots} possession={ballWith} /></Gamecast>
+		{:else if hasSurface && league.id === 'nhl'}
+			<Gamecast {game} {plays}><Rink {game} {shots} /></Gamecast>
+		{:else if hasSurface && league.periodStyle === 'halves' && detail}
+			<Gamecast {game} {plays}><Pitch {game} shots={detail.shots} teamStats={detail.teamStats} /></Gamecast>
 		{/if}
 
 		{#if detail?.overview.recap}
