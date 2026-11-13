@@ -2,7 +2,8 @@
 	// ScoreCard from ScoreStyle.swift: logo and name outside, big scores, status in the middle.
 	import Football from './Football.svelte';
 	import { type Game, type Competitor, headlineStatus, substatus, hasBall, isLosing } from './espn';
-	let { game }: { game: Game } = $props();
+	// showsDate adds the local date under the status, for lists that span days (the Fantasy weeks).
+	let { game, showsDate = false }: { game: Game; showsDate?: boolean } = $props();
 </script>
 
 {#snippet side(c: Competitor)}
@@ -29,6 +30,7 @@
 			{#if game.status === 'live'}<span class="dot"></span>{/if}
 			{headlineStatus(game)}
 		</span>
+		{#if showsDate}<span class="caption">{game.startDate.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })}</span>{/if}
 		{#if substatus(game)}<span class="caption">{substatus(game)}</span>{/if}
 		{#if game.status !== 'final' && game.broadcasts.length}
 			<span class="tv glass" title={game.broadcasts.join(', ')}>
