@@ -127,7 +127,7 @@
 		--caption: 10px;
 		--title3: 15px;
 		--sports-green: #2d6526;
-		--glass: rgba(255, 255, 255, 0.08);
+		--glass: rgba(255, 255, 255, 0.06);
 		--glass-edge: rgba(255, 255, 255, 0.22);
 	}
 	:global(html, body) {
@@ -164,8 +164,8 @@
 	/* Liquid Glass stand-in: blurred, saturated backdrop with a bright hairline edge and top highlight. */
 	:global(.glass) {
 		background: var(--glass);
-		backdrop-filter: blur(24px) saturate(180%);
-		-webkit-backdrop-filter: blur(24px) saturate(180%);
+		backdrop-filter: blur(24px) saturate(125%);
+		-webkit-backdrop-filter: blur(24px) saturate(125%);
 		border: 0.5px solid var(--glass-edge);
 		box-shadow:
 			inset 0 1px 0 rgba(255, 255, 255, 0.18),
@@ -211,7 +211,9 @@
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
-		background: rgba(30, 30, 32, 0.32);
+		background: rgba(255, 255, 255, 0.025);
+		backdrop-filter: blur(30px);
+		-webkit-backdrop-filter: blur(30px);
 	}
 	.tauri .sidebar {
 		padding-top: 54px;
@@ -270,6 +272,9 @@
 		user-select: text;
 		-webkit-user-select: text;
 	}
+	.search input::placeholder {
+		color: var(--secondary);
+	}
 	.search:focus-within {
 		outline: 3px solid rgba(10, 132, 255, 0.55);
 	}
@@ -314,13 +319,13 @@
 	.content {
 		margin-left: var(--sidebar);
 	}
-	/* SwiftUI's soft scroll edge: content blurs and darkens as it slides under a page's sticky header. */
+	/* SwiftUI's soft scroll edge: content blurs as it slides under a page's sticky header. Blur only, no tint, so an
+	   unscrolled page shows no band and the top meets the sidebar in one colour. */
 	.content :global(> header::before) {
 		content: '';
 		position: absolute;
 		z-index: -1;
 		inset: 0 0 -18px;
-		background: linear-gradient(rgba(0, 0, 0, 0.35), transparent);
 		backdrop-filter: blur(10px);
 		-webkit-backdrop-filter: blur(10px);
 		mask-image: linear-gradient(black 55%, transparent);
