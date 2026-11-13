@@ -81,10 +81,38 @@ export async function sleeperLeagues(userID: string, season: string): Promise<{ 
 
 const ownedBy = (userID: string) => (r: any) => r.owner_id === userID || (r.co_owners ?? []).includes(userID);
 
-// shortcut: the ~15 MB player list is fetched once per launch and kept in memory; cache it on disk (as the Swift app does, 3 h) if launches feel slow.
+/** One IndexedDB request on the 'cache' store; undefined where storage is unavailable (private windows, tests). */
+function cacheRequest<T>(make: (store: IDBObjectStore) => IDBRequest): Promise<T | undefined> {
+	return new Promise((resolve) => {
+		if (typeof indexedDB === 'undefined') return resolve(undefined);
+		const open = indexedDB.open('halftime', 1);
+		open.onupgradeneeded = () => open.result.createObjectStore('cache');
+		open.onerror = () => resolve(undefined);
+		open.onsuccess = () => {
+			try {
+				const request = make(open.result.transaction('cache', 'readwrite').objectStore('cache'));
+				request.onsuccess = () => resolve(request.result);
+				request.onerror = () => resolve(undefined);
+			} catch {
+				resolve(undefined);
+			}
+		};
+	});
+}
+
+// The ~15 MB player list, parsed, kept 3 hours as the Swift app does (IndexedDB: localStorage is too small for it).
+const playersTTL = 3 * 3_600_000;
 let playersPromise: Promise<Record<string, Player>> | undefined;
 function sleeperPlayers(): Promise<Record<string, Player>> {
-	playersPromise ??= getJSON(`${sleeper}players/nfl`).then((all: Record<string, any>) => {
+	playersPromise ??= cacheRequest<{ at: number; players: Record<string, Player> }>((s) => s.get('sleeperPlayers')).then((saved) =>
+		saved && Date.now() - saved.at < playersTTL ? saved.players : fetchSleeperPlayers()
+	);
+	playersPromise.catch(() => (playersPromise = undefined));
+	return playersPromise;
+}
+
+function fetchSleeperPlayers(): Promise<Record<string, Player>> {
+	return getJSON(`${sleeper}players/nfl`).then((all: Record<string, any>) => {
 		const players: Record<string, Player> = {};
 		for (const [id, p] of Object.entries(all)) {
 			const espnID = p.espn_id ? String(p.espn_id) : undefined;
@@ -100,10 +128,9 @@ function sleeperPlayers(): Promise<Record<string, Player>> {
 				injury: p.injury_status ? { status: p.injury_status, detail: detail || undefined } : undefined
 			};
 		}
+		cacheRequest((s) => s.put({ at: Date.now(), players }, 'sleeperPlayers'));
 		return players;
 	});
-	playersPromise.catch(() => (playersPromise = undefined));
-	return playersPromise;
 }
 
 async function sleeperTeam(leagueID: string, userID: string): Promise<Team | undefined> {
