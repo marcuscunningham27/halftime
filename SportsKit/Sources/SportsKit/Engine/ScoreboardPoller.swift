@@ -61,6 +61,10 @@ public final class ScoreboardPoller {
         defer { isLoading = false }
         do {
             let provider = provider, day = date ?? .now
+            // Following today, a game still live from before midnight stays in the list until a poll sees it end,
+            // so it doesn't vanish mid-game and its final alert still fires.
+            let carried = date == nil
+                ? games.filter { $0.status == .live && $0.startDate < Calendar.current.startOfDay(for: day) } : []
             let results = await withTaskGroup(of: Result<[Game], Error>.self) { group in
                 for league in leagues {
                     group.addTask {
@@ -77,7 +81,13 @@ public final class ScoreboardPoller {
                 if case .failure(let error) = result { error } else { nil }
             }
             if !results.isEmpty, failures.count == results.count { throw failures[0] }
-            let games = results.flatMap { (try? $0.get()) ?? [] }
+            var games = results.flatMap { (try? $0.get()) ?? [] }
+            for game in carried where !games.contains(where: { $0.id == game.id }) {
+                guard let league = leagues.first(where: { $0.id == game.leagueID }) else { continue }
+                // On a failed fetch keep the last copy, so the next poll tries again instead of dropping it.
+                let fresh = try? await provider.scoreboard(league: league, date: game.startDate).first { $0.id == game.id }
+                games.append(fresh ?? game)
+            }
             // Changes while the app was closed (a game going final) aren't news, so a cached start compares as a first load.
             let old = showingCache ? [] : self.games
             showingCache = false
