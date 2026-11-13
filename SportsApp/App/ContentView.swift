@@ -13,6 +13,13 @@ struct ContentView: View {
     let provider: any SportsProvider
 
     @State private var leagues: [League] = []
+    /// League IDs, comma-separated, in the order dragged into in the sidebar; empty = the usual order.
+    @AppStorage("leagueOrder") private var leagueOrder = ""
+
+    /// The leagues in the sidebar's order, which Home's sections follow.
+    private var orderedLeagues: [League] {
+        League.ordered(leagues, by: leagueOrder.split(separator: ",").map(String.init))
+    }
     @State private var selection: SidebarItem? = .home
     @State private var query = ""
     @FocusState private var searchFocused: Bool
@@ -113,10 +120,16 @@ struct ContentView: View {
             }
         }
         Section("Leagues") {
-            ForEach(leagues) { league in
+            ForEach(orderedLeagues) { league in
                 Label { Text(league.abbreviation) } icon: { LeagueLogo(league: league, size: 18) }
                     .tag(SidebarItem.league(league.id))
                     .onReselect { popToRoot += 1 }
+            }
+            // Drag a league to reorder; Home's sections follow.
+            .onMove { from, to in
+                var ids = orderedLeagues.map(\.id)
+                ids.move(fromOffsets: from, toOffset: to)
+                leagueOrder = ids.joined(separator: ",")
             }
         }
     }
@@ -205,7 +218,7 @@ struct ContentView: View {
             if leagues.isEmpty {
                 placeholder
             } else {
-                HomeView(provider: provider, leagues: leagues) { selection = .league($0.id) }
+                HomeView(provider: provider, leagues: orderedLeagues) { selection = .league($0.id) }
             }
         case .fantasy:
             FantasyView(provider: provider)

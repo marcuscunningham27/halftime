@@ -105,7 +105,8 @@ struct FantasyView: View {
                                 }
                             }
                         }
-                        Divider()
+                        // Only separates leagues from Manage Leagues…; with none added it would sit alone at the top.
+                        if !store.leagues.isEmpty { Divider() }
                         SettingsLink { Text("Manage Leagues…") }
                     } label: {
                         HStack(spacing: 8) {

@@ -80,6 +80,13 @@ public struct League: Identifiable, Hashable, Sendable {
     /// AFL and NRL were dropped (Oct 2026): ESPN's data for them is too thin. Follows of theirs are pruned on launch.
     public static let all: [League] = [.nfl, .cfb, .nba, .wnba, .mlb, .nhl, .epl, .ucl, .mls]
 
+    /// Leagues in the order the person dragged them into in the sidebar; any not in `order` (new ones) follow in
+    /// their usual place. Home lists its sections in the same order.
+    public static func ordered(_ leagues: [League], by order: [League.ID]) -> [League] {
+        func rank(_ index: Int, _ league: League) -> Int { order.firstIndex(of: league.id) ?? order.count + index }
+        return leagues.enumerated().sorted { rank($0.offset, $0.element) < rank($1.offset, $1.element) }.map(\.element)
+    }
+
     /// ESPN's league logo, for section headers. Soccer logos are filed under ESPN's numeric league IDs.
     public var logoURL: URL? {
         let soccer = [League.epl.id: 23, League.ucl.id: 2, League.mls.id: 19]

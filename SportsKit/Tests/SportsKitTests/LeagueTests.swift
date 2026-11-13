@@ -418,3 +418,10 @@ private let fixtures: [LeagueFixture] = [
         #expect(state.onFirst && state.onSecond && state.onThird)
     }
 }
+
+@Test func leaguesFollowTheSavedOrderAndNewOnesKeepTheirPlace() {
+    let all = League.all
+    #expect(League.ordered(all, by: []).map(\.id) == all.map(\.id))
+    #expect(League.ordered(all, by: ["nba", "epl", "nfl"]).map(\.id).prefix(4) == ["nba", "epl", "nfl", "cfb"])
+    #expect(League.ordered(all, by: ["gone", "nhl"]).first?.id == "nhl")
+}
