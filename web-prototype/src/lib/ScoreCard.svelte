@@ -2,7 +2,7 @@
 	// ScoreCard from ScoreStyle.swift: logo and name outside, big scores, status in the middle.
 	import Football from './Football.svelte';
 	import { isFollowingTeam } from './follows.svelte';
-	import { type Game, type Competitor, headlineStatus, substatus, hasBall, isLosing } from './espn';
+	import { type Game, type Competitor, headlineStatus, substatus, hasBall, isLosing, rankedName } from './espn';
 	// showsDate adds the local date under the status, for lists that span days (the Fantasy weeks).
 	let { game, showsDate = false }: { game: Game; showsDate?: boolean } = $props();
 </script>
@@ -15,7 +15,7 @@
 				<svg class="star" viewBox="0 0 20 20" width="9" height="9" role="img" aria-label="Following"><path d="M10 2.5l2.2 4.6 5 .6-3.7 3.5 1 5L10 13.8 5.5 16.2l1-5L2.8 7.7l5-.6z" fill="currentColor" /></svg>
 			{/if}
 		</span>
-		<span class="name">{c.team.shortName}</span>
+		<span class="name">{rankedName(c)}</span>
 	</div>
 {/snippet}
 

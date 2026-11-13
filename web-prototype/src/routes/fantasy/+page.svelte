@@ -1,5 +1,5 @@
 <script lang="ts">
-	// FantasyView.swift: Lineup, Past Week, Upcoming, Season and News for the league picked from the title menu.
+	// FantasyView.swift: Lineup, Past Games, Upcoming, Season and News for the league picked from the title menu.
 	// shortcut: no AI week briefing (WeekOverviewCard) yet.
 	import Backdrop from '$lib/Backdrop.svelte';
 	import GlassPicker from '$lib/GlassPicker.svelte';
@@ -15,7 +15,7 @@
 	const active = $derived(leagues.find((l) => F.refID(l) === activeID) ?? leagues[0]);
 	let managing = $state(F.store.leagues().length === 0);
 	let menuOpen = $state(false);
-	const tabs = ['Lineup', 'Past Week', 'Upcoming', 'Season', 'News'] as const;
+	const tabs = ['Lineup', 'Past Games', 'Upcoming', 'Season', 'News'] as const;
 	let tab = $state<(typeof tabs)[number]>('Lineup');
 
 	type Base = {
@@ -111,13 +111,13 @@
 		return { game: g, lines };
 	}
 
-	// Past Week: the played week on show (nil follows the latest), loaded when the tab opens or the week changes.
+	// Past Games: the played week on show (nil follows the latest), loaded when the tab opens or the week changes.
 	let chosenWeek = $state<number | undefined>();
 	let past = $state<{ week: number; entries: Entry[] } | undefined>();
 	const pastWeek = $derived(chosenWeek ?? base?.latestWeek);
 	$effect(() => {
 		const b = base, week = pastWeek;
-		if (tab !== 'Past Week' || !b || !week || past?.week === week) return;
+		if (tab !== 'Past Games' || !b || !week || past?.week === week) return;
 		(async () => {
 			const played = (await nflWeek(b.state.season, week))
 				.filter((g) => g.status !== 'scheduled' && involves(g, b.team))
@@ -256,7 +256,7 @@
 		<p class="message">Loading your team…</p>
 	{:else}
 		<div class="tabs"><GlassPicker options={[...tabs]} bind:selected={tab} /></div>
-		{#if tab === 'Past Week'}
+		{#if tab === 'Past Games'}
 			<label class="week-picker">
 				<span class="sr-only">Week</span>
 				<select bind:value={() => pastWeek, (w) => (chosenWeek = w === base?.latestWeek ? undefined : w)}>

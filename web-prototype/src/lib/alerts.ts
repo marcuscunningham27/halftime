@@ -21,8 +21,8 @@ export const events: { type: EventType; title: string; onByDefault: boolean }[] 
 export function applies(type: EventType, game: Game): boolean {
 	const l = game.league;
 	switch (type) {
-		case 'redZone': return l.id === 'nfl';
-		case 'closeGame': return l.periodStyle !== 'halves';
+		case 'redZone': return l.sport === 'football';
+		case 'closeGame': return l.sport !== 'soccer' && l.sport !== 'baseball';
 		case 'periodEnd': return l.periodStyle === 'quarters' || l.periodStyle === 'periods';
 		case 'halftime': return l.periodStyle === 'quarters' || l.periodStyle === 'halves';
 		default: return true;
@@ -36,7 +36,7 @@ export const scoreLine = (g: Game) => `${g.away.team.abbreviation} ${g.away.scor
 export function compactPeriod(g: Game): string {
 	if (g.statusName === 'STATUS_HALFTIME') return 'Half';
 	const l = g.league;
-	if (l.periodStyle === 'halves') return g.statusDetail;
+	if (l.periodStyle === 'halves' || l.periodStyle === 'innings') return g.statusDetail;
 	if (g.period > l.regulationPeriods) {
 		const ot = g.period - l.regulationPeriods;
 		return ot === 1 ? 'OT' : `${ot}OT`;
@@ -47,7 +47,9 @@ export function compactPeriod(g: Game): string {
 /** Menu bar text, e.g. "WSH 3 – 13 SF · Q2". */
 export const compactScore = (g: Game) => `${g.away.team.abbreviation} ${g.away.score ?? 0} – ${g.home.score ?? 0} ${g.home.team.abbreviation} · ${compactPeriod(g)}`;
 
-const closeGame: Record<string, { margin: number; seconds: number }> = { nfl: { margin: 8, seconds: 300 }, nba: { margin: 5, seconds: 120 }, nhl: { margin: 1, seconds: 300 } };
+const closeGame: Record<string, { margin: number; seconds: number }> = {
+	nfl: { margin: 8, seconds: 300 }, cfb: { margin: 8, seconds: 300 }, nba: { margin: 5, seconds: 120 }, wnba: { margin: 5, seconds: 120 }, nhl: { margin: 1, seconds: 300 }
+};
 
 /** Within the league's margin with its last minutes left in the final regulation period or later. */
 function isClose(g: Game): boolean {

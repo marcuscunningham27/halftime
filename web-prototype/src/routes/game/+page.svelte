@@ -7,17 +7,19 @@
 	import Court from '$lib/Court.svelte';
 	import Rink from '$lib/Rink.svelte';
 	import Pitch from '$lib/Pitch.svelte';
+	import Diamond from '$lib/Diamond.svelte';
 	import Gamecast from '$lib/Gamecast.svelte';
 	import Football from '$lib/Football.svelte';
 	import GlassPicker from '$lib/GlassPicker.svelte';
 	import FollowButton from '$lib/FollowButton.svelte';
+	import { loadRoster } from '$lib/roster.svelte';
 	import Overview from '$lib/tabs/Overview.svelte';
 	import TeamStats from '$lib/tabs/TeamStats.svelte';
 	import PlayByPlay from '$lib/tabs/PlayByPlay.svelte';
 	import BoxScore from '$lib/tabs/BoxScore.svelte';
 	import {
 		leagueByID, scoreboard, summary, startOfDay, fieldState, headlineStatus, hasBall, isLosing, periodLabel, backdropHex, hex,
-		possession, type Game, type GameDetail, type Competitor
+		possession, rankedName, type Game, type GameDetail, type Competitor
 	} from '$lib/espn';
 
 	const id = page.url.searchParams.get('id');
@@ -25,7 +27,7 @@
 	const dayParam = Number(page.url.searchParams.get('day'));
 	const day = dayParam ? new Date(dayParam) : startOfDay(0);
 	const league = leagueByID(page.url.searchParams.get('league'));
-	const football = league.id === 'nfl';
+	const football = league.sport === 'football';
 
 	let game = $state<Game | undefined>();
 	let detail = $state<GameDetail | undefined>();
@@ -50,6 +52,11 @@
 		}
 	}
 
+	// Your fantasy players get starred on NFL pages; the roster loads at most every 10 minutes.
+	$effect(() => {
+		if (league.id === 'nfl') loadRoster();
+	});
+
 	// Polls every 15 seconds until the game is over, so a page opened before kickoff goes live by itself.
 	$effect(() => {
 		load();
@@ -61,8 +68,8 @@
 	const plays = $derived(detail?.plays ?? []);
 	/** Located shots: basketball without free throws (they all come from the same spot), hockey shots and goals. */
 	const shots = $derived(
-		league.id === 'nba' ? plays.filter((p) => p.location && p.isShot && !/free throw/i.test(p.type ?? ''))
-		: league.id === 'nhl' ? plays.filter((p) => p.location && /shot|goal/i.test(p.type ?? ''))
+		league.sport === 'basketball' ? plays.filter((p) => p.location && p.isShot && !/free throw/i.test(p.type ?? ''))
+		: league.sport === 'hockey' ? plays.filter((p) => p.location && /shot|goal/i.test(p.type ?? ''))
 		: []
 	);
 	// A surface shows while live, or afterwards when there's something to draw on it.
@@ -91,7 +98,7 @@
 		</div>
 		<img src={c.team.logo} alt="" width="48" height="48" />
 		<span class="team-line">
-			<a class="team-name" href="/league?league={league.id}&team={c.team.id}"><strong>{c.team.shortName}</strong></a>
+			<a class="team-name" href="/league?league={league.id}&team={c.team.id}"><strong>{rankedName(c)}</strong></a>
 			<FollowButton leagueID={league.id} team={c.team} name={c.team.shortName} />
 		</span>
 		{#if c.record}<span class="secondary">{c.record}</span>{/if}
@@ -129,13 +136,15 @@
 		</div>
 
 		{#if field}
-			<Gamecast {game} {plays}><FieldView {game} {field} /></Gamecast>
-		{:else if hasSurface && league.id === 'nba'}
-			<Gamecast {game} {plays}><Court {game} {shots} possession={ballWith} /></Gamecast>
-		{:else if hasSurface && league.id === 'nhl'}
-			<Gamecast {game} {plays}><Rink {game} {shots} /></Gamecast>
-		{:else if hasSurface && league.periodStyle === 'halves' && detail}
-			<Gamecast {game} {plays}><Pitch {game} shots={detail.shots} teamStats={detail.teamStats} /></Gamecast>
+			<Gamecast {game} {plays} court={detail?.court}><FieldView {game} {field} /></Gamecast>
+		{:else if hasSurface && league.sport === 'basketball'}
+			<Gamecast {game} {plays} court={detail?.court}><Court {game} {shots} possession={ballWith} /></Gamecast>
+		{:else if hasSurface && league.sport === 'hockey'}
+			<Gamecast {game} {plays} court={detail?.court}><Rink {game} {shots} /></Gamecast>
+		{:else if league.sport === 'baseball' && (game.status === 'live' || plays.some((p) => p.location))}
+			<Gamecast {game} {plays} court={detail?.court}><Diamond {game} {plays} teamStats={detail?.teamStats ?? []} /></Gamecast>
+		{:else if hasSurface && league.sport === 'soccer' && detail}
+			<Gamecast {game} {plays} court={detail?.court}><Pitch {game} shots={detail.shots} teamStats={detail.teamStats} /></Gamecast>
 		{/if}
 
 		{#if detail?.overview.recap}
@@ -159,7 +168,7 @@
 			{:else if tab === 'Stats'}
 				<TeamStats {game} stats={detail.teamStats} />
 			{:else if tab === 'Play-By-Play'}
-				<PlayByPlay {game} drives={detail.drives} plays={detail.plays} />
+				<PlayByPlay {game} drives={detail.drives} plays={detail.plays} overview={detail.overview} />
 			{:else}
 				<BoxScore {game} boxScores={detail.boxScores} leaders={detail.overview.leaders} />
 			{/if}

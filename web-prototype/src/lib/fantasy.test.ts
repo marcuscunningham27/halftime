@@ -33,3 +33,12 @@ test('season trend averages per week and ranks the gaps', () => {
 	assert.equal(trend.gapByPosition[0].gap, -3);
 	assert.deepEqual(trend.gapByStarter.map((g) => [g.name, g.gap]), [['Runner', -6], ['Passer', 8]]);
 });
+
+test('roster finds your players in plays by full or short name, as whole words', async () => {
+	const { playersIn, shortName } = await import('./fantasy.ts');
+	const players = ['Jayden Daniels', 'Christian McCaffrey', 'Amon-Ra St. Brown', 'Marvin Harrison Jr.'].map((name) => ({ id: name, name }));
+	assert.equal(shortName('Marvin Harrison Jr.'), 'M.Harrison');
+	assert.deepEqual(playersIn('(Shotgun) J.Daniels pass deep middle to A.Williams to SF 28 for 17 yards', players).map((p) => p.name), ['Jayden Daniels']);
+	assert.deepEqual(playersIn('A.St. Brown right end to DET 40 for 5 yards', players).map((p) => p.name), ['Amon-Ra St. Brown']);
+	assert.deepEqual(playersIn('AJ.Daniels pass incomplete', players), []);
+});

@@ -1,9 +1,11 @@
 <script lang="ts">
 	// PlayByPlayView: drives for football (All Drives / Scoring Drives), plays by period for other sports; newest first.
-	// shortcut: no win-probability chart above the drives yet; port ProbabilityView if the prototype is a go.
 	import GlassPicker from '../GlassPicker.svelte';
-	import { type Game, type Drive, type Play, hex, periodTitle } from '../espn';
-	let { game, drives, plays }: { game: Game; drives: Drive[]; plays: Play[] } = $props();
+	import Probability from './Probability.svelte';
+	import FantasyBadge from '../FantasyBadge.svelte';
+	import { playersIn } from '../roster.svelte';
+	import { type Game, type Drive, type Play, type Overview, hex, periodTitle } from '../espn';
+	let { game, drives, plays, overview }: { game: Game; drives: Drive[]; plays: Play[]; overview: Overview } = $props();
 
 	const byDrive = $derived(drives.length > 0);
 	const options = $derived(byDrive ? ['All Drives', 'Scoring Drives'] : ['All Plays', 'Scoring Plays']);
@@ -31,6 +33,7 @@
 	<div class="empty-state">No Plays Yet</div>
 {:else}
 	<div class="stack">
+		<Probability {game} {plays} {overview} />
 		<div class="picker"><GlassPicker {options} bind:selected={filter} /></div>
 		{#if !byDrive}
 			{#each periods as period (period)}
@@ -66,8 +69,14 @@
 				{#each [...drive.plays].reverse() as play (play.id)}
 					{@const [lead, spot] = footer(play)}
 					<hr />
-					<div class="play">
-						{#if play.type}<strong>{play.type}</strong>{/if}
+					{@const yours = game.league.id === 'nfl' ? playersIn(play.text) : []}
+					<div class="play" class:yours={yours.length > 0}>
+						{#if play.type || yours.length}
+							<span class="headline">
+								{#if play.type}<strong>{play.type}</strong>{/if}
+								{#each yours as p (p.id)}<FantasyBadge /><span class="mine">{p.name}</span>{/each}
+							</span>
+						{/if}
 						<p class:scoring={play.isScoring} class:plain={!play.type}>{play.text}</p>
 						<span class="footer">{lead}{#if spot}<span class="spot">{spot}</span>{/if}</span>
 					</div>
@@ -156,6 +165,22 @@
 	.score {
 		font-size: var(--subheadline);
 		white-space: nowrap;
+	}
+	.play.yours {
+		margin: 0 -6px;
+		padding-inline: 6px;
+		border-radius: 8px;
+		background: rgba(255, 214, 10, 0.14);
+	}
+	.headline {
+		display: flex;
+		align-items: center;
+		gap: 5px;
+	}
+	.mine {
+		font-size: var(--caption);
+		font-weight: 600;
+		color: #ffd60a;
 	}
 	.footer {
 		font-size: var(--subheadline);

@@ -9,13 +9,16 @@ type Saved = {
 	closeToMenu: boolean;
 	/** "league:team" keys of followed teams whose alerts are off. */
 	muted: string[];
+	/** For weather at the venue; starts from the system's region. */
+	units: 'metric' | 'imperial';
 };
 
 const defaults = (): Saved => ({
 	alerts: Object.fromEntries(events.map((e) => [e.type, e.onByDefault])) as Record<EventType, boolean>,
 	quietHours: { enabled: false, start: 22 * 60, end: 7 * 60 },
 	closeToMenu: true,
-	muted: []
+	muted: [],
+	units: typeof navigator !== 'undefined' && /-(US|LR|MM)$/.test(navigator.language) ? 'imperial' : 'metric'
 });
 
 function load(): Saved {

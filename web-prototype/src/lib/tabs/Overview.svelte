@@ -1,8 +1,30 @@
 <script lang="ts">
 	// GameOverviewView: venue, game info, odds, standings and the pre-game win probability.
-	// shortcut: no weather card or venue local time (the Swift app geocodes with MapKit); Open-Meteo's geocoder could replace it.
 	import { type Game, type Overview, ordinal, hex } from '../espn';
+	import { locate, weather as forecast, describe, type Place, type Weather } from '../weather';
+	import { settings } from '../settings.svelte';
 	let { game, overview }: { game: Game; overview: Overview } = $props();
+
+	// Locate the venue once, for its time zone and the weather at the start.
+	let place = $state<Place | undefined>();
+	let weather = $state<Weather | undefined>();
+	$effect(() => {
+		const v = overview.venue;
+		if (!v?.city) return;
+		locate(v.city, v.region).then(async (p) => {
+			place = p;
+			weather = p && (await forecast(p, game.startDate));
+		}).catch(() => {});
+	});
+	const localTime = $derived.by(() => {
+		if (!place?.timeZone) return;
+		const opts: Intl.DateTimeFormatOptions = { weekday: 'short', hour: 'numeric', minute: '2-digit' };
+		const there = game.startDate.toLocaleString([], { ...opts, timeZone: place.timeZone });
+		return there === game.startDate.toLocaleString([], opts) ? undefined : there;
+	});
+	const imperial = $derived(settings.units === 'imperial');
+	const temp = (c: number) => (imperial ? `${Math.round((c * 9) / 5 + 32)}°F` : `${Math.round(c)}°C`);
+	const speed = (kmh: number) => (imperial ? `${Math.round(kmh / 1.609)} mph` : `${Math.round(kmh)} km/h`);
 
 	const signed = (n: number) => (n > 0 ? `+${n}` : `−${Math.abs(n)}`);
 	const oneDecimal = (n: number) => String(Math.round(n * 10) / 10);
@@ -34,11 +56,28 @@
 	<section class="sports-card">
 		<h2>Game Info</h2>
 		{@render info('Your time', game.startDate.toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }))}
+		{#if localTime}{@render info(`Local time${overview.venue?.city ? ` in ${overview.venue.city}` : ''}`, localTime)}{/if}
 		{#if overview.venue}{@render info('Venue', [overview.venue.name, overview.venue.place].filter(Boolean).join(', '))}{/if}
 		{#if overview.broadcasts.length}{@render info('Watch', overview.broadcasts.join(', '))}{/if}
 		{#if game.note}{@render info('Event', game.note)}{/if}
 		{#if overview.attendance}{@render info('Attendance', overview.attendance.toLocaleString())}{/if}
 	</section>
+
+	{#if weather}
+		{@const [summary, icon] = describe(weather.code)}
+		<section class="sports-card">
+			<h2>{game.status === 'scheduled' ? 'Weather at Kickoff' : 'Weather at the Start'}</h2>
+			<div class="weather">
+				<span class="icon" aria-hidden="true">{icon}</span>
+				<div class="temp"><span class="big">{temp(weather.celsius)}</span><span class="dim">{summary}</span></div>
+				<div class="extra dim">
+					{#if weather.windKmh !== undefined}<span>Wind {speed(weather.windKmh)}</span>{/if}
+					{#if weather.rainChance !== undefined}<span>Rain {weather.rainChance}%</span>{/if}
+				</div>
+			</div>
+			<p class="footnote">Forecast by Open-Meteo for the venue's location.</p>
+		</section>
+	{/if}
 
 	{#if overview.odds}
 		{@const o = overview.odds}
@@ -130,6 +169,31 @@
 	}
 	.dim {
 		color: var(--secondary);
+	}
+	.weather {
+		display: flex;
+		align-items: center;
+		gap: 14px;
+		padding: 6px 0;
+	}
+	.icon {
+		font-size: 34px;
+	}
+	.temp {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.big {
+		font: 700 34px/1 'Chakra Petch', sans-serif;
+	}
+	.extra {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 4px;
+		font-size: var(--subheadline);
 	}
 	.footnote {
 		margin: 4px 0 0;

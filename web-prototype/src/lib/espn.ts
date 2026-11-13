@@ -1,21 +1,44 @@
-// Ported from SportsKit's ESPN provider: the same unofficial endpoints, trimmed to what Home and the NFL page need.
+// Ported from SportsKit's ESPN provider: the same unofficial endpoints.
 
-export type League = { id: string; name: string; abbreviation: string; path: string; regulationPeriods: number; periodStyle: 'quarters' | 'periods' | 'halves' };
+export type Sport = 'football' | 'basketball' | 'hockey' | 'baseball' | 'soccer';
+export type League = {
+	id: string;
+	name: string;
+	abbreviation: string;
+	path: string;
+	sport: Sport;
+	regulationPeriods: number;
+	periodStyle: 'quarters' | 'periods' | 'halves' | 'innings';
+};
 
+/** Every league, in sidebar order (League.all). */
 export const leagues: League[] = [
-	{ id: 'nfl', name: 'National Football League', abbreviation: 'NFL', path: 'football/nfl', regulationPeriods: 4, periodStyle: 'quarters' },
-	{ id: 'nba', name: 'National Basketball Association', abbreviation: 'NBA', path: 'basketball/nba', regulationPeriods: 4, periodStyle: 'quarters' },
-	{ id: 'nhl', name: 'National Hockey League', abbreviation: 'NHL', path: 'hockey/nhl', regulationPeriods: 3, periodStyle: 'periods' },
-	{ id: 'epl', name: 'Premier League', abbreviation: 'EPL', path: 'soccer/eng.1', regulationPeriods: 2, periodStyle: 'halves' }
+	{ id: 'nfl', name: 'National Football League', abbreviation: 'NFL', path: 'football/nfl', sport: 'football', regulationPeriods: 4, periodStyle: 'quarters' },
+	// AP Top 25 only: ESPN's default scoreboard is ranked teams' games, and search offers the poll's teams.
+	{ id: 'cfb', name: 'College Football', abbreviation: 'NCAAF', path: 'football/college-football', sport: 'football', regulationPeriods: 4, periodStyle: 'quarters' },
+	{ id: 'nba', name: 'National Basketball Association', abbreviation: 'NBA', path: 'basketball/nba', sport: 'basketball', regulationPeriods: 4, periodStyle: 'quarters' },
+	{ id: 'wnba', name: "Women's National Basketball Association", abbreviation: 'WNBA', path: 'basketball/wnba', sport: 'basketball', regulationPeriods: 4, periodStyle: 'quarters' },
+	{ id: 'mlb', name: 'Major League Baseball', abbreviation: 'MLB', path: 'baseball/mlb', sport: 'baseball', regulationPeriods: 9, periodStyle: 'innings' },
+	{ id: 'nhl', name: 'National Hockey League', abbreviation: 'NHL', path: 'hockey/nhl', sport: 'hockey', regulationPeriods: 3, periodStyle: 'periods' },
+	{ id: 'epl', name: 'Premier League', abbreviation: 'EPL', path: 'soccer/eng.1', sport: 'soccer', regulationPeriods: 2, periodStyle: 'halves' },
+	{ id: 'ucl', name: 'UEFA Champions League', abbreviation: 'UCL', path: 'soccer/uefa.champions', sport: 'soccer', regulationPeriods: 2, periodStyle: 'halves' },
+	{ id: 'mls', name: 'Major League Soccer', abbreviation: 'MLS', path: 'soccer/usa.1', sport: 'soccer', regulationPeriods: 2, periodStyle: 'halves' }
 ];
 
-/** Soccer league logos live under ESPN's numeric league IDs (League.logoURL). */
+const soccerLogoIDs: Record<string, number> = { epl: 23, ucl: 2, mls: 19 };
+/** Soccer league logos live under ESPN's numeric league IDs; college football has its own icon (League.logoURL). */
 export const leagueLogo = (l: League) =>
-	l.id === 'epl' ? 'https://a.espncdn.com/i/leaguelogos/soccer/500/23.png' : `https://a.espncdn.com/i/teamlogos/leagues/500/${l.id}.png`;
+	l.id === 'cfb' ? 'https://a.espncdn.com/redesign/assets/img/icons/NCAASports_Football.png'
+	: soccerLogoIDs[l.id] ? `https://a.espncdn.com/i/leaguelogos/soccer/500/${soccerLogoIDs[l.id]}.png`
+	: `https://a.espncdn.com/i/teamlogos/leagues/500/${l.id}.png`;
 
 export type Team = { id: string; abbreviation: string; displayName: string; shortName: string; color?: string; alternateColor?: string; logo?: string };
-export type Competitor = { team: Team; score?: number; record?: string; periodScores: number[] };
-export type Situation = { possessionTeamID?: string; yardLine?: number; distance?: number; shortDownAndDistance?: string; isRedZone?: boolean; downAndDistance?: string };
+/** rank: the AP Top 25 place, college football's ranked teams only. */
+export type Competitor = { team: Team; score?: number; record?: string; periodScores: number[]; rank?: number };
+/** "#5 Georgia" for a ranked team, else the short name (Competitor.rankedName). */
+export const rankedName = (c: Competitor) => (c.rank ? `#${c.rank} ${c.team.shortName}` : c.team.shortName);
+export type Baseball = { balls: number; strikes: number; outs: number; onFirst: boolean; onSecond: boolean; onThird: boolean; batter?: string; pitcher?: string };
+export type Situation = { possessionTeamID?: string; yardLine?: number; distance?: number; shortDownAndDistance?: string; isRedZone?: boolean; downAndDistance?: string; baseball?: Baseball };
 export type Status = 'scheduled' | 'live' | 'final';
 export type Game = {
 	id: string;
@@ -91,7 +114,9 @@ function parseEvent(e: any, league: League): Game {
 			team: parseTeam(x.team),
 			score: status === 'scheduled' ? undefined : Number(x.score),
 			record: x.records?.[0]?.summary,
-			periodScores: (x.linescores ?? []).map((l: any) => Number(l.value ?? l.displayValue))
+			periodScores: (x.linescores ?? []).map((l: any) => Number(l.value ?? l.displayValue)),
+			// ESPN marks unranked teams 99.
+			rank: x.curatedRank?.current >= 1 && x.curatedRank.current <= 25 ? x.curatedRank.current : undefined
 		};
 	};
 	const s = c.situation;
@@ -112,7 +137,12 @@ function parseEvent(e: any, league: League): Game {
 			downAndDistance: s.downDistanceText,
 			yardLine: s.yardLine,
 			distance: s.distance,
-			shortDownAndDistance: s.shortDownDistanceText && (s.possessionText ? `${s.shortDownDistanceText} · ${s.possessionText}` : s.shortDownDistanceText)
+			shortDownAndDistance: s.shortDownDistanceText && (s.possessionText ? `${s.shortDownDistanceText} · ${s.possessionText}` : s.shortDownDistanceText),
+			baseball: s.balls === undefined ? undefined : {
+				balls: s.balls, strikes: s.strikes ?? 0, outs: s.outs ?? 0, onFirst: !!s.onFirst, onSecond: !!s.onSecond, onThird: !!s.onThird,
+				batter: s.batter?.athlete?.shortName ?? s.batter?.athlete?.displayName,
+				pitcher: s.pitcher?.athlete?.shortName ?? s.pitcher?.athlete?.displayName
+			}
 		},
 		note: c.notes?.[0]?.headline,
 		broadcasts: watchOn(c)
@@ -139,13 +169,14 @@ export function headlineStatus(g: Game): string {
 	if (g.status === 'scheduled') return g.startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 	if (g.status === 'final') return g.statusDetail;
 	if (g.statusName === 'STATUS_HALFTIME') return 'Half';
-	if (g.statusName === 'STATUS_END_PERIOD' || g.league.periodStyle === 'halves') return g.statusDetail;
+	if (g.statusName === 'STATUS_END_PERIOD' || g.league.periodStyle === 'halves' || g.league.periodStyle === 'innings') return g.statusDetail;
 	const period = g.period <= g.league.regulationPeriods ? ordinal(g.period) : periodLabel(g.league, g.period);
 	return `${period} ${g.clock}`;
 }
 
 export function periodLabel(l: League, n: number): string {
-	if (n <= l.regulationPeriods) return String(n);
+	if (n <= l.regulationPeriods || l.periodStyle === 'innings') return String(n);
+	if (l.periodStyle === 'halves') return 'ET';
 	const ot = n - l.regulationPeriods;
 	return ot === 1 ? 'OT' : `${ot}OT`;
 }
@@ -200,7 +231,7 @@ export type BoxScore = { teamID: string; title: string; labels: string[]; rows: 
 export type TeamStat = { label: string; away: string; home: string };
 export type Leader = { teamID: string; category: string; athlete: string; shortName?: string; position?: string; headshot?: string; mainValue?: string; summary?: string };
 export type Overview = {
-	venue?: { name: string; place?: string; image?: string };
+	venue?: { name: string; place?: string; city?: string; region?: string; image?: string };
 	attendance?: number;
 	broadcasts: string[];
 	odds?: { books: string[]; homeSpread?: number; overUnder?: number; homeMoneyLine?: number; awayMoneyLine?: number };
@@ -209,10 +240,17 @@ export type Overview = {
 	leaders: Leader[];
 	recap?: { headline: string; paragraphs: string[] };
 };
-export type GameDetail = { plays: Play[]; shots: Shot[]; drives: Drive[]; periodScores: Record<string, number[]>; boxScores: BoxScore[]; teamStats: TeamStat[]; overview: Overview };
+/** Live state the scoreboard doesn't carry: timeouts left, team fouls this period and bonus; hockey's power play and empty net. */
+export type CourtSide = { timeoutsLeft?: number; fouls?: number; inBonus: boolean };
+export type Court = { away: CourtSide; home: CourtSide; powerPlay: boolean; emptyNet: boolean };
+export type GameDetail = { court?: Court; plays: Play[]; shots: Shot[]; drives: Drive[]; periodScores: Record<string, number[]>; boxScores: BoxScore[]; teamStats: TeamStat[]; overview: Overview };
 
 export async function summary(game: Game): Promise<GameDetail> {
-	const s = await get(`${base}${game.league.path}/summary?event=${game.id}`);
+	const [s, court] = await Promise.all([
+		get(`${base}${game.league.path}/summary?event=${game.id}`),
+		// An optional extra while live: the surface still draws without timeouts and fouls.
+		game.status === 'live' && game.league.sport !== 'baseball' && game.league.sport !== 'soccer' ? courtSituation(game).catch(() => undefined) : undefined
+	]);
 	let drives: any[] = s.drives?.previous ?? [];
 	// The live drive also appears at the end of `previous`, possibly stale.
 	if (s.drives?.current) drives = [...drives.filter((d) => d.id !== s.drives.current.id), s.drives.current];
@@ -230,8 +268,15 @@ export async function summary(game: Game): Promise<GameDetail> {
 	else {
 		// Some feeds leave scoringPlay empty, so fall back to the running score changing.
 		let previous = [0, 0];
+		let lastPitch: any;
 		plays = (s.plays ?? s.keyEvents ?? []).map((p: any) => {
 			const play = parsePlay(p, game.league);
+			if (p.type?.text === 'Play Result') {
+				// A result's outcome ("Single", "Fly Out") is the type of the pitch put in play; strikeouts and walks have none.
+				if (lastPitch?.text?.endsWith('In Play')) play.headline = lastPitch.type?.text;
+				play.headline ??= baseballResult(play.text);
+			}
+			lastPitch = p;
 			if (p.scoringPlay === undefined && p.awayScore !== undefined && p.homeScore !== undefined) {
 				play.isScoring = p.awayScore !== previous[0] || p.homeScore !== previous[1];
 				previous = [p.awayScore, p.homeScore];
@@ -240,6 +285,7 @@ export async function summary(game: Game): Promise<GameDetail> {
 		});
 	}
 	return {
+		court,
 		plays,
 		shots: shots(s),
 		drives: modelDrives,
@@ -277,18 +323,60 @@ function parsePlay(p: any, league: League, teamID?: string): Play {
 		endYardLine: p.end?.yardLine,
 		period: p.period?.number ?? 0,
 		clock: p.clock?.displayValue ?? '',
-		location: location(league, c),
-		isShot: p.shootingPlay ?? false
+		location: league.sport === 'baseball' ? hitSpot(p.hitCoordinate) : location(league, c),
+		isShot: p.shootingPlay ?? p.hitCoordinate !== undefined
 	};
 }
+
+/** ESPN's core API, where "football/nfl" is written "football/leagues/nfl". Football gives timeouts left as a number;
+ *  basketball nests them in an object whose remaining count is timeoutsRemainingCurrent. */
+async function courtSituation(game: Game): Promise<Court> {
+	const [sport, league] = game.league.path.split('/');
+	const d = await get(`https://sports.core.api.espn.com/v2/sports/${sport}/leagues/${league}/events/${game.id}/competitions/${game.id}/situation`);
+	const side = (timeouts: any, fouls: any): CourtSide => ({
+		timeoutsLeft: typeof timeouts === 'number' ? timeouts : timeouts?.timeoutsRemainingCurrent,
+		fouls: fouls?.teamFoulsCurrent,
+		inBonus: fouls?.bonusState !== undefined && fouls.bonusState !== 'NONE'
+	});
+	return { away: side(d.awayTimeouts, d.awayFouls), home: side(d.homeTimeouts, d.homeFouls), powerPlay: !!d.powerPlay, emptyNet: !!d.emptyNet };
+}
+
+/** Hockey: the team on the power play is the one the latest penalty was against ("Dobes Interference against Graf"),
+ *  which ESPN files under the offender's team. */
+export function powerPlayTeam(plays: Play[], awayID: string, homeID: string): string | undefined {
+	const penalty = plays.findLast((p) => p.text.includes(' against '));
+	return penalty?.teamID === awayID ? homeID : penalty?.teamID === homeID ? awayID : undefined;
+}
+
+/** Baseball's hit chart is 250 units square; anything outside is ESPN's "unknown". */
+const hitSpot = (h: any): Play['location'] =>
+	h && h.x >= 0 && h.x <= 250 && h.y >= 0 && h.y <= 250 ? { x: h.x / 250, y: h.y / 250 } : undefined;
+
+/** Names a baseball result from ESPN's wording ("Kwan reached on infield single…" → "Single"), checked in order, so
+ *  "grounded into double play" reads as a double play (Play.baseballResult). */
+export function baseballResult(text: string): string | undefined {
+	const t = text.toLowerCase();
+	const names: [string, string[]][] = [
+		['Pitching Change', ['relieved']], ['Stolen Base', [' stole ']], ['Caught Stealing', ['caught stealing']],
+		['Substitution', [' ran for ', ' hit for ', ' in left field', ' in center field', ' in right field', ' at catcher']],
+		['Double Play', ['double play']], ['Sacrifice Fly', ['sacrifice fly']], ['Sacrifice', ['sacrifice bunt', 'bunted']],
+		['Home Run', ['homered']], ['Triple', ['tripled']], ['Double', ['doubled']], ['Single', ['singled', 'infield single']],
+		['Strikeout', ['struck out']], ['Walk', ['walked']], ['Hit By Pitch', ['hit by pitch']], ["Fielder's Choice", ["fielder's choice"]],
+		['Error', ['reached on', 'error']], ['Ground Out', ['grounded']], ['Fly Out', ['flied']], ['Line Out', ['lined']],
+		['Pop Out', ['popped']], ['Foul Out', ['fouled out']]
+	];
+	return names.find(([, words]) => words.some((w) => t.includes(w)))?.[0];
+}
+
+export const isBaseHit = (p: Play) => ['Single', 'Double', 'Triple', 'Home Run'].includes(p.headline ?? '');
 
 /** A play's spot as 0–1 of the surface; off-surface values are ESPN's "unknown". */
 function location(league: League, c: any): Play['location'] {
 	if (!c || typeof c.x !== 'number' || typeof c.y !== 'number') return;
 	// NBA: feet on a half court (50 wide, 47 deep).
-	if (league.id === 'nba' && c.x >= 0 && c.x <= 50 && c.y >= 0 && c.y <= 47) return { x: c.x / 50, y: c.y / 47 };
+	if (league.sport === 'basketball' && c.x >= 0 && c.x <= 50 && c.y >= 0 && c.y <= 47) return { x: c.x / 50, y: c.y / 47 };
 	// NHL: feet from centre ice on the 200 × 85 rink.
-	if (league.id === 'nhl' && Math.abs(c.x) <= 100 && Math.abs(c.y) <= 42.5) return { x: (c.x + 100) / 200, y: (42.5 - c.y) / 85 };
+	if (league.sport === 'hockey' && Math.abs(c.x) <= 100 && Math.abs(c.y) <= 42.5) return { x: (c.x + 100) / 200, y: (42.5 - c.y) / 85 };
 }
 
 export type ShotOutcome = 'goal' | 'save' | 'offTarget' | 'block';
@@ -322,10 +410,18 @@ function shots(s: any): Shot[] {
 	});
 }
 
+const mlbStats: Record<string, string[]> = {
+	batting: ['hits', 'runs', 'homeRuns', 'RBIs', 'walks', 'strikeouts', 'runnersLeftOnBase', 'avg'],
+	pitching: ['pitches', 'strikes', 'earnedRuns'],
+	fielding: ['errors', 'doublePlays']
+};
+const flatStats = (groups: any[]) =>
+	groups.flatMap((g) => (g.stats ? (mlbStats[g.name] ?? []).map((name) => g.stats.find((s: any) => s.name === name)).filter(Boolean) : [g]));
+
 /** Both teams list the same stats in the same order. */
 function teamStats(teams: any[]): TeamStat[] {
-	const away = teams.find((t) => t.homeAway === 'away')?.statistics ?? [];
-	const home = teams.find((t) => t.homeAway === 'home')?.statistics ?? [];
+	const away = flatStats(teams.find((t) => t.homeAway === 'away')?.statistics ?? []);
+	const home = flatStats(teams.find((t) => t.homeAway === 'home')?.statistics ?? []);
 	return away
 		.map((a: any, i: number) => ({ label: a.label ?? a.displayName, away: a.displayValue, home: home[i]?.displayValue }))
 		.filter((t: TeamStat) => t.label && t.away !== undefined && t.home !== undefined);
@@ -343,7 +439,7 @@ function overview(s: any): Overview {
 	const winProbability: Record<string, number> = {};
 	for (const side of [s.predictor?.homeTeam, s.predictor?.awayTeam]) if (side?.id && side.gameProjection) winProbability[side.id] = Number(side.gameProjection);
 	return {
-		venue: v?.fullName && { name: v.fullName, place: [v.address?.city, v.address?.state].filter(Boolean).join(', ') || undefined, image: v.images?.[0]?.href },
+		venue: v?.fullName && { name: v.fullName, place: [v.address?.city, v.address?.state].filter(Boolean).join(', ') || undefined, city: v.address?.city, region: v.address?.state, image: v.images?.[0]?.href },
 		attendance: s.gameInfo?.attendance || undefined,
 		broadcasts: [...new Set<string>((s.header?.competitions?.[0]?.broadcasts ?? []).map((b: any) => b.media?.shortName).filter(Boolean))],
 		odds: books.length
@@ -458,7 +554,7 @@ export const yardsGained = (p: Play, homeOffense: boolean) =>
 // Gamecast helpers, as Gamecast.swift.
 
 /** Period and game ends ("End Period", "End of Game"). */
-export const isMarker = (p: Play) => /^(end|period)/i.test(p.type ?? '');
+export const isMarker = (p: Play) => /^(end|period)/i.test(p.type ?? '') || (p.type ?? '').toLowerCase() === 'start inning';
 
 /** The play's team. Football files timeouts under the drive's team, so read "Timeout #1 by SF" instead. */
 export function playTeam(p: Play, g: Game): Team | undefined {
@@ -472,10 +568,12 @@ export function bannerTitle(p: Play, g: Game): string {
 	if (g.status === 'final') return 'End of Game';
 	if (/timeout/i.test(p.type ?? '')) return 'Timeout';
 	if (isMarker(p)) return p.headline ?? (p.text || p.type) ?? 'End of Period';
+	if (p.type === 'Start Batter/Pitcher') return 'At Bat';
 	return p.headline ?? p.type ?? 'Last Play';
 }
 
 export function periodTitle(l: League, n: number): string {
+	if (l.periodStyle === 'innings') return `Inning ${n}`;
 	if (l.periodStyle === 'halves') return n === 1 ? 'First Half' : n === 2 ? 'Second Half' : 'Extra Time';
 	if (n <= l.regulationPeriods) return `${l.periodStyle === 'quarters' ? 'Quarter' : 'Period'} ${n}`;
 	return n - l.regulationPeriods === 1 ? 'Overtime' : `Overtime ${n - l.regulationPeriods}`;
@@ -549,10 +647,38 @@ const standingsSpecs: Record<string, { level?: number; columns: [string, string]
 	nfl: { level: 3, columns: [['wins', 'W'], ['losses', 'L'], ['ties', 'T'], ['winPercent', 'PCT']], rankBy: ['winPercent', 'wins'] },
 	nba: { columns: [['wins', 'W'], ['losses', 'L'], ['winPercent', 'PCT'], ['gamesBehind', 'GB']], rankBy: ['winPercent', 'wins'] },
 	nhl: { level: 3, columns: [['gamesPlayed', 'GP'], ['wins', 'W'], ['losses', 'L'], ['otLosses', 'OTL'], ['points', 'PTS']], rankBy: ['points', 'wins'] },
-	epl: { columns: [['gamesPlayed', 'GP'], ['wins', 'W'], ['ties', 'D'], ['losses', 'L'], ['pointDifferential', 'GD'], ['points', 'PTS']], rankBy: ['points', 'pointDifferential', 'pointsFor'] }
+	wnba: { columns: [['wins', 'W'], ['losses', 'L'], ['winPercent', 'PCT'], ['gamesBehind', 'GB']], rankBy: ['winPercent', 'wins'] },
+	mlb: { level: 3, columns: [['wins', 'W'], ['losses', 'L'], ['winPercent', 'PCT'], ['gamesBehind', 'GB']], rankBy: ['winPercent', 'wins'] },
+	epl: soccerTable(),
+	ucl: soccerTable(),
+	mls: soccerTable()
 };
 
+/** Every soccer league's table: points, then goal difference, then goals scored. */
+function soccerTable() {
+	return { columns: [['gamesPlayed', 'GP'], ['wins', 'W'], ['ties', 'D'], ['losses', 'L'], ['pointDifferential', 'GD'], ['points', 'PTS']] as [string, string][], rankBy: ['points', 'pointDifferential', 'pointsFor'] };
+}
+
+/** College football shows the AP poll (else ESPN's first poll) as a one-table standings: record and poll points. */
+async function rankings(league: League): Promise<Standings> {
+	const polls: any[] = (await get(`${base}${league.path}/rankings`)).rankings ?? [];
+	const poll = polls.find((p) => p.type === 'ap') ?? polls[0];
+	if (!poll) return { columns: [], groups: [] };
+	return {
+		columns: ['REC', 'PTS'],
+		groups: [{
+			name: poll.name ?? 'AP Top 25',
+			entries: (poll.ranks ?? []).map((r: any) => ({
+				// Poll teams carry a location and nickname rather than display names.
+				team: { ...parseTeam(r.team), shortName: r.team.location, displayName: `${r.team.location} ${r.team.name}` },
+				values: [r.recordSummary ?? '–', r.points !== undefined ? String(Math.round(r.points)) : '–']
+			}))
+		}]
+	};
+}
+
 export async function standings(league: League): Promise<Standings> {
+	if (league.id === 'cfb') return rankings(league);
 	const spec = standingsSpecs[league.id];
 	// Standings live under /apis/v2, not the site API. Level 3 splits conferences into divisions.
 	const root = await get(`https://site.api.espn.com/apis/v2/sports/${league.path}/standings${spec.level ? `?level=${spec.level}` : ''}`);
@@ -598,4 +724,62 @@ export function allTeams() {
 	teamsPromise ??= Promise.all(leagues.map((l) => standings(l).then((s) => s.groups.flatMap((g) => g.entries.map((e) => ({ league: l, team: e.team })))).catch(() => [])))
 		.then((all) => all.flat().sort((a, b) => a.team.displayName.localeCompare(b.team.displayName)));
 	return teamsPromise;
+}
+
+// Win probability, as Probability.swift: ESPN's per-play chances, placed on the game clock.
+
+/** ESPN's per-play chances, all 0–1 from the home side except `over`. */
+export type ProbabilityPoint = { playID: string; homeWin: number; homeCover?: number; over?: number };
+/** A point placed on the clock: 0 at kickoff, 1 at the end of regulation, beyond 1 in overtime. */
+export type ChartPoint = ProbabilityPoint & { progress: number; homeScore: number; awayScore: number; period: number; clock: string };
+
+export async function probabilities(game: Game): Promise<ProbabilityPoint[]> {
+	const [sport, league] = game.league.path.split('/');
+	const d = await get(`https://sports.core.api.espn.com/v2/sports/${sport}/leagues/${league}/events/${game.id}/competitions/${game.id}/probabilities?limit=1000`);
+	return (d.items ?? []).flatMap((item: any) => {
+		// ".../plays/4018730081?lang=en" → "4018730081"
+		const id = item.play?.$ref?.split('/plays/').at(-1)?.split('?')[0];
+		return id && typeof item.homeWinPercentage === 'number' ? [{ playID: id, homeWin: item.homeWinPercentage, homeCover: item.spreadCoverProbHome, over: item.totalOverProb }] : [];
+	});
+}
+
+/** Seconds per regulation period for sports placed by their clock; others are spread evenly by play order. */
+const periodSeconds: Record<string, number> = { nfl: 900, nba: 720 };
+
+/** Seconds on the clock at a play: "m:ss", or plain seconds ("45.3") as basketball shows in a period's last minute. */
+export function clockSeconds(clock: string): number | undefined {
+	const parts = clock.split(':').map(Number);
+	if (parts.some(isNaN)) return;
+	return parts.length === 2 ? parts[0] * 60 + parts[1] : parts.length === 1 ? parts[0] : undefined;
+}
+
+/** Places each point at its play's moment; points without a matching play are dropped. */
+export function probabilityChart(points: ProbabilityPoint[], plays: Play[], league: League): ChartPoint[] {
+	const byID = new Map(plays.map((p) => [p.id, p]));
+	const seconds = periodSeconds[league.id];
+	const matched = points.flatMap((pt) => (byID.has(pt.playID) ? [[pt, byID.get(pt.playID)!] as const] : []));
+	let away = 0, home = 0;
+	const chart = matched.flatMap(([pt, play], index): ChartPoint[] => {
+		away = play.awayScore ?? away;
+		home = play.homeScore ?? home;
+		let progress: number;
+		if (seconds) {
+			const clock = clockSeconds(play.clock);
+			// A timed sport's play without a readable clock can't be placed; guessing would draw lines back across the chart.
+			if (clock === undefined) return [];
+			if (play.period > league.regulationPeriods) {
+				// Each overtime period takes a further 15% of the chart width.
+				const overtime = play.period - league.regulationPeriods - 1;
+				progress = 1 + 0.15 * (overtime + 1 - Math.min(clock / seconds, 1));
+			} else {
+				const left = clock + Math.max(0, league.regulationPeriods - play.period) * seconds;
+				progress = 1 - left / (seconds * league.regulationPeriods);
+			}
+		} else {
+			progress = matched.length > 1 ? index / (matched.length - 1) : 0;
+		}
+		return [{ ...pt, progress, homeScore: home, awayScore: away, period: play.period, clock: play.clock }];
+	});
+	// Time order, in case the feed lists plays out of order (a stable sort, so ties keep feed order).
+	return chart.map((c, i) => [c, i] as const).sort((a, b) => a[0].progress - b[0].progress || a[1] - b[1]).map(([c]) => c);
 }

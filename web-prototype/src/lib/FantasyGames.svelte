@@ -7,7 +7,7 @@
 </script>
 
 <script lang="ts">
-	// FantasyView's Past Week and Upcoming lists: each game's score card, then your players in it.
+	// FantasyView's Past Games and Upcoming lists: each game's score card, then your players in it.
 	import ScoreCard from './ScoreCard.svelte';
 	let { entries, empty }: { entries: Entry[]; empty: string } = $props();
 	const teamLogo = (g: Game, abbr?: string) => [g.away.team, g.home.team].find((t) => t.abbreviation === abbr)?.logo;

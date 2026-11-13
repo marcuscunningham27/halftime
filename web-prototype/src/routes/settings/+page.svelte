@@ -67,6 +67,15 @@
 			<hr />
 			{@render toggle('Close to Menu', settings.closeToMenu, (on) => ((settings.closeToMenu = on), saveSettings()))}
 			<p class="footnote">Closing the window leaves Halftime in the menu bar (the system tray on Windows). Scores and alerts keep coming.</p>
+			<hr />
+			<label class="toggle-row">
+				<span>Units</span>
+				<select class="units" value={settings.units} onchange={(e) => ((settings.units = e.currentTarget.value as 'metric' | 'imperial'), saveSettings())}>
+					<option value="metric">Metric (°C, km/h)</option>
+					<option value="imperial">Imperial (°F, mph)</option>
+				</select>
+			</label>
+			<p class="footnote">For weather at the venue. Field and court measurements stay in each sport’s own units.</p>
 		</section>
 	{:else if tab === 'Notifications'}
 		<section class="sports-card">
@@ -233,6 +242,15 @@
 		opacity: 0.4;
 	}
 	input[type='time'] {
+		font: inherit;
+		color: var(--label);
+		background: rgba(255, 255, 255, 0.08);
+		border: 0.5px solid rgba(255, 255, 255, 0.18);
+		border-radius: 6px;
+		padding: 3px 6px;
+		color-scheme: dark;
+	}
+	.units {
 		font: inherit;
 		color: var(--label);
 		background: rgba(255, 255, 255, 0.08);

@@ -1,6 +1,8 @@
 <script lang="ts">
 	// BoxScoreView: game leaders, then player stat tables, away team first.
 	import Leaders from './Leaders.svelte';
+	import FantasyBadge from '../FantasyBadge.svelte';
+	import { isRostered } from '../roster.svelte';
 	import type { Game, BoxScore, Leader } from '../espn';
 	let { game, boxScores, leaders }: { game: Game; boxScores: BoxScore[]; leaders: Leader[] } = $props();
 	const ordered = $derived([game.away.team.id, game.home.team.id].flatMap((id) => boxScores.filter((b) => b.teamID === id)));
@@ -19,7 +21,8 @@
 						<thead><tr><th>Player</th>{#each box.labels as label}<th>{label}</th>{/each}</tr></thead>
 						<tbody>
 							{#each box.rows as row (row.id)}
-								<tr><td>{row.name}</td>{#each row.stats as stat}<td>{stat}</td>{/each}</tr>
+								{@const yours = game.league.id === 'nfl' && isRostered(row.id, row.name)}
+								<tr class:yours><td>{row.name} {#if yours}<FantasyBadge />{/if}</td>{#each row.stats as stat}<td>{stat}</td>{/each}</tr>
 							{/each}
 						</tbody>
 					</table>
@@ -59,6 +62,9 @@
 		color: var(--secondary);
 		border-bottom: 1px solid var(--separator);
 		padding-bottom: 7px;
+	}
+	tr.yours td:first-child {
+		color: #ffd60a;
 	}
 	tbody tr:first-child td {
 		padding-top: 7px;

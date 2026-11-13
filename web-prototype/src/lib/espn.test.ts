@@ -2,7 +2,7 @@
 // Run with `npm test` (Node's own test runner, which reads TypeScript directly).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { possession, readable, brightness, type Play } from './espn.ts';
+import { possession, readable, brightness, baseballResult, probabilityChart, clockSeconds, type Play } from './espn.ts';
 
 const play = (type: string, teamID: string, extra: Partial<Play> = {}): Play => ({ id: type, text: type, type, teamID, isScoring: false, isShot: false, period: 1, clock: '', ...extra });
 
@@ -28,4 +28,22 @@ test('readable darkens pale team colours and leaves dark ones alone', () => {
 	const gold = readable('#ffb81c', 1.225); // Bruins gold, at the game page's lightest fold
 	assert.ok(whiteRatio(brightness(gold, 1.225)) >= 4.49, `white on ${gold} is too faint`);
 	assert.notEqual(gold, '#ffb81c');
+});
+
+test('baseball results are named from ESPN wording, in order', () => {
+	assert.equal(baseballResult('Kwan reached on infield single to shortstop.'), 'Single');
+	assert.equal(baseballResult('Ramirez grounded into double play, shortstop to first.'), 'Double Play');
+	assert.equal(baseballResult('Judge struck out swinging.'), 'Strikeout');
+	assert.equal(baseballResult('Soto homered to right (412 feet).'), 'Home Run');
+	assert.equal(baseballResult('Mound visit.'), undefined);
+});
+
+test('probabilities are placed on the game clock', () => {
+	const nfl = { id: 'nfl', regulationPeriods: 4 };
+	const plays = [play('Kickoff', 'A', { id: 'a', period: 1, clock: '15:00' }), play('Pass', 'A', { id: 'b', period: 3, clock: '15:00' }), play('Run', 'A', { id: 'c', period: 5, clock: '5:00' })];
+	const chart = probabilityChart([{ playID: 'c', homeWin: 0.9 }, { playID: 'a', homeWin: 0.5 }, { playID: 'b', homeWin: 0.6 }, { playID: 'gone', homeWin: 0.1 }], plays, nfl);
+	assert.deepEqual(chart.map((c) => c.playID), ['a', 'b', 'c']);
+	assert.deepEqual(chart.map((c) => Math.round(c.progress * 100) / 100), [0, 0.5, 1.1]);
+	assert.equal(clockSeconds('45.3'), 45.3);
+	assert.equal(clockSeconds('2:05'), 125);
 });

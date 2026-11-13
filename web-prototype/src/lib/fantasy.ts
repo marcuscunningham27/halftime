@@ -479,3 +479,27 @@ export function sameName(a: string, b: string): boolean {
 	const key = (name: string) => name.toLowerCase().replace(/[^\p{L}\s]/gu, '').split(/\s+/).filter((w) => w && !['jr', 'sr', 'ii', 'iii', 'iv', 'v'].includes(w)).join(' ');
 	return key(a) === key(b);
 }
+
+// MARK: Spotting your players in games, as FantasyRoster.
+
+/** ESPN's play-by-play short form: "Jayden Daniels" → "J.Daniels", "Amon-Ra St. Brown" → "A.St. Brown". */
+export function shortName(name: string): string | undefined {
+	const words = name.split(' ').filter((w) => !['jr.', 'jr', 'sr.', 'sr', 'ii', 'iii', 'iv', 'v'].includes(w.toLowerCase()));
+	return words.length >= 2 ? `${words[0][0]}.${words.slice(1).join(' ')}` : undefined;
+}
+
+/** `name` appears in `text` not glued to other letters ("J.Brown" isn't in "AJ.Brown" or "J.Browning"). */
+function mentions(text: string, name: string): boolean {
+	for (let i = text.indexOf(name); i >= 0; i = text.indexOf(name, i + 1)) {
+		const before = text[i - 1], after = text[i + name.length];
+		if (!(before && (/\p{L}/u.test(before) || before === '.')) && !(after && /\p{L}/u.test(after))) return true;
+	}
+	return false;
+}
+
+/** The players a play's text names, by full or short name, as whole words. */
+export const playersIn = (text: string, players: Player[]) =>
+	players.filter((p) => [p.name, shortName(p.name)].some((n) => n && mentions(text, n)));
+
+/** Whether a box score row is one of yours: by ESPN ID, else by name. */
+export const isRostered = (athleteID: string, name: string, players: Player[]) => players.some((p) => p.espnID === athleteID || p.name === name);

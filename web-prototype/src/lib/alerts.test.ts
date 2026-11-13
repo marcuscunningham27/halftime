@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { EventDetector, isQuiet, compactScore } from './alerts.ts';
 
-const league = { id: 'nfl', name: 'NFL', abbreviation: 'NFL', path: '', regulationPeriods: 4, periodStyle: 'quarters' };
+const league = { id: 'nfl', name: 'NFL', abbreviation: 'NFL', path: '', sport: 'football', regulationPeriods: 4, periodStyle: 'quarters' };
 const team = (id) => ({ id, abbreviation: id, displayName: id, shortName: id });
 const game = (over = {}) => ({
 	id: '1', league, startDate: new Date(), status: 'live', period: 2, clock: '7:00', statusDetail: '7:00 - 2nd', statusName: 'STATUS_IN_PROGRESS',
