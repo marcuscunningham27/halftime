@@ -14,6 +14,8 @@
 	let error = $state<string | undefined>();
 	/** What the search found: leagues to add (Sleeper) or teams to pick from (ESPN). */
 	let found = $state<{ label: string; ref: LeagueRef }[]>([]);
+	/** Cookies that opened the league just searched; saved only when one of its teams is added. */
+	let pendingCookies: { leagueID: string; credentials?: { espnS2: string; swid: string } } | undefined;
 
 	async function find() {
 		busy = true;
@@ -31,7 +33,7 @@
 				const id = leagueID.trim();
 				const credentials = espnS2.trim() && swid.trim() ? { espnS2: espnS2.trim(), swid: swid.trim() } : undefined;
 				const league = await espnLeague(id, season, credentials);
-				store.setCredentials(id, credentials);
+				pendingCookies = { leagueID: id, credentials };
 				found = league.teams.map((t) => ({ label: t.name, ref: { provider: 'espn', leagueID: id, name: league.name, memberID: t.id } }));
 			}
 		} catch (e) {
@@ -40,7 +42,15 @@
 		busy = false;
 	}
 
-	function add(ref: LeagueRef) {
+	async function add(ref: LeagueRef) {
+		if (ref.provider === 'espn' && pendingCookies?.leagueID === ref.leagueID) {
+			try {
+				await store.setCredentials(ref.leagueID, pendingCookies.credentials);
+			} catch {
+				error = 'Couldn’t save the ESPN cookies to the Keychain.';
+				return;
+			}
+		}
 		leagues = [...leagues.filter((l) => refID(l) !== refID(ref)), ref];
 		store.saveLeagues(leagues);
 		store.setActive(refID(ref));

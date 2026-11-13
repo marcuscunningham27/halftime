@@ -1,7 +1,8 @@
 <script lang="ts">
 	// ContentView.swift's sidebar: Home and Fantasy, search, followed leagues then teams, every league, Settings.
 	import { page } from '$app/state';
-	import { leagues, leagueLogo, allTeams, type League, type Team } from '$lib/espn';
+	import { leagues, leagueLogo, allTeams, orderLeagues, moveLeague, type League, type Team } from '$lib/espn';
+	import { settings, saveSettings } from '$lib/settings.svelte';
 	import { follows } from '$lib/follows.svelte';
 	import FollowButton from '$lib/FollowButton.svelte';
 	import { startLive, refreshLive } from '$lib/live';
@@ -40,6 +41,31 @@
 		JSON.stringify(follows);
 		if (inTauri) refreshLive();
 	});
+	// Leagues in the order dragged into below; Home lists its sections the same way.
+	const ordered = $derived(orderLeagues(leagues, settings.leagueOrder));
+	let dragging = $state<string | undefined>();
+	let dropBefore = $state<string | null | undefined>(); // a league ID, null for the end, undefined when not over the list
+	function reorder(id: string, before: string | undefined) {
+		settings.leagueOrder = moveLeague(ordered.map((l) => l.id), id, before);
+		saveSettings();
+	}
+	function drop(e: DragEvent) {
+		// Stop the browser opening the dragged link as a page.
+		e.preventDefault();
+		if (dragging && dropBefore !== undefined && dropBefore !== dragging) reorder(dragging, dropBefore ?? undefined);
+		[dragging, dropBefore] = [undefined, undefined];
+	}
+	/** Option-↑ / ↓ moves the focused league, for anyone not using a mouse. */
+	function keyMove(e: KeyboardEvent, i: number) {
+		if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+		e.preventDefault();
+		const ids = ordered.map((l) => l.id);
+		const to = e.key === 'ArrowUp' ? i - 1 : i + 2;
+		if (to < 0 || to > ids.length) return;
+		reorder(ids[i], ids[to]);
+		requestAnimationFrame(() => (document.querySelectorAll<HTMLElement>('.league-row')[e.key === 'ArrowUp' ? i - 1 : i + 1])?.focus());
+	}
+
 	// Leaving for another page clears the search.
 	$effect(() => {
 		page.url.href;
@@ -94,9 +120,35 @@
 					<a href={teamHref(leagueID, team.id)} class:on={current === teamHref(leagueID, team.id)}><img src={team.logo} alt="" width="16" height="16" />{team.displayName}</a>
 				{/each}
 				<span class="section">Leagues</span>
-				{#each leagues as l}
-					<a href={leagueHref(l.id)} class:on={current === leagueHref(l.id)}><img src={leagueLogo(l)} alt="" width="16" height="16" />{l.abbreviation}</a>
-				{/each}
+				<!-- Drag a league (or Option-↑ / ↓) to reorder; Home's sections follow. -->
+				<div class="leagues" role="group" aria-label="Leagues, drag to reorder" ondragover={(e) => e.preventDefault()} ondrop={drop}>
+					{#each ordered as l, i (l.id)}
+						<a
+							class="league-row"
+							class:on={current === leagueHref(l.id)}
+							class:dragging={dragging === l.id}
+							class:drop-above={dropBefore === l.id && dragging !== l.id}
+							href={leagueHref(l.id)}
+							draggable="true"
+							title="Drag to reorder"
+							aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
+							ondragstart={(e) => {
+								dragging = l.id;
+								e.dataTransfer?.setData('text/plain', l.id);
+								if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+							}}
+							ondragover={(e) => {
+								e.preventDefault();
+								// Over the lower half of a row means "after it", i.e. before the next one.
+								const box = e.currentTarget.getBoundingClientRect();
+								dropBefore = e.clientY > box.top + box.height / 2 ? (ordered[i + 1]?.id ?? null) : l.id;
+							}}
+							ondragend={() => ([dragging, dropBefore] = [undefined, undefined])}
+							onkeydown={(e) => keyMove(e, i)}
+						><img src={leagueLogo(l)} alt="" width="16" height="16" draggable="false" />{l.abbreviation}</a>
+					{/each}
+					{#if dragging && dropBefore === null}<span class="drop-end"></span>{/if}
+				</div>
 			{/if}
 		</div>
 		<a class="settings" href="/settings" class:on={current === '/settings'}>
@@ -289,6 +341,23 @@
 	}
 	.settings {
 		margin-top: 6px;
+	}
+	.leagues {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.league-row.dragging {
+		opacity: 0.4;
+	}
+	/* Where the dragged league will land: a line above the row it goes before, or under the last. */
+	.league-row.drop-above {
+		box-shadow: inset 0 2px 0 #0a84ff;
+	}
+	.drop-end {
+		height: 2px;
+		margin: 0 10px;
+		background: #0a84ff;
 	}
 	.sidebar a {
 		display: flex;

@@ -11,6 +11,8 @@ type Saved = {
 	muted: string[];
 	/** For weather at the venue; starts from the system's region. */
 	units: 'metric' | 'imperial';
+	/** League IDs in the order dragged into in the sidebar, which Home's sections follow; empty = the usual order. */
+	leagueOrder: string[];
 };
 
 const defaults = (): Saved => ({
@@ -18,7 +20,8 @@ const defaults = (): Saved => ({
 	quietHours: { enabled: false, start: 22 * 60, end: 7 * 60 },
 	closeToMenu: true,
 	muted: [],
-	units: typeof navigator !== 'undefined' && /-(US|LR|MM)$/.test(navigator.language) ? 'imperial' : 'metric'
+	units: typeof navigator !== 'undefined' && /-(US|LR|MM)$/.test(navigator.language) ? 'imperial' : 'metric',
+	leagueOrder: []
 });
 
 function load(): Saved {

@@ -1,5 +1,5 @@
 <script lang="ts">
-	// SettingsView.swift: General, Notifications, Following and Fantasy. Summaries arrive with the AI features.
+	// SettingsView.swift: General, Notifications, Following, Fantasy and Summaries.
 	import { goto } from '$app/navigation';
 	import Backdrop from '$lib/Backdrop.svelte';
 	import GlassPicker from '$lib/GlassPicker.svelte';
@@ -11,8 +11,9 @@
 	import { teamKey } from '$lib/follows.svelte';
 	import { settings, saveSettings } from '$lib/settings.svelte';
 	import { events } from '$lib/alerts';
+	import { getKey, setKey, model } from '$lib/claude';
 
-	const tabs = ['General', 'Notifications', 'Following', 'Fantasy'] as const;
+	const tabs = ['General', 'Notifications', 'Following', 'Fantasy', 'Summaries'] as const;
 	let tab = $state<(typeof tabs)[number]>('General');
 	const inTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -38,6 +39,23 @@
 		saveSettings();
 	}
 	let fantasyLeagues = $state(store.leagues());
+
+	// Summaries: the Anthropic key, kept in the Keychain (Credential Manager on Windows), never shown once saved.
+	let hasKey = $state(false);
+	let draft = $state('');
+	let keyError = $state<string | undefined>();
+	$effect(() => {
+		getKey().then((k) => (hasKey = !!k));
+	});
+	async function saveKey(value: string) {
+		try {
+			await setKey(value);
+			hasKey = !!value.trim();
+			[draft, keyError] = ['', undefined];
+		} catch {
+			keyError = inTauri ? 'The Keychain couldn’t save the key.' : 'The key couldn’t be saved.';
+		}
+	}
 	const leagueOf = (id: string) => leagues.find((l) => l.id === id);
 </script>
 
@@ -136,8 +154,29 @@
 			</section>
 		{/if}
 		<p class="footnote">Followed teams come first on Home under My Teams and in the menu bar. A muted team sends no alerts.</p>
-	{:else}
+	{:else if tab === 'Fantasy'}
 		<LeagueSetup bind:leagues={fantasyLeagues} onclose={() => goto('/fantasy')} />
+	{:else}
+		<section class="sports-card">
+			<h2>Anthropic API</h2>
+			{#if hasKey}
+				<div class="toggle-row">
+					<span>API key</span>
+					<span class="saved">Saved in {inTauri ? 'Keychain' : 'this browser session'} <button class="remove" onclick={() => saveKey('')}>Remove Key</button></span>
+				</div>
+			{:else}
+				<form class="key-row" onsubmit={(e) => (e.preventDefault(), saveKey(draft))}>
+					<input type="password" bind:value={draft} placeholder="sk-ant-…" aria-label="Anthropic API key" autocomplete="off" spellcheck="false" />
+					<button class="glass save" disabled={!draft.trim()}>Save</button>
+				</form>
+			{/if}
+			{#if keyError}<p class="footnote error" role="alert">{keyError}</p>{/if}
+			<p class="footnote">
+				Claude writes game recaps, answers questions the stats can't, and briefs you on your fantasy week, using {model}. Get a key at console.anthropic.com.
+				{#if !inTauri}On the web the key is kept only until this tab closes.{/if}
+			</p>
+		</section>
+		<p class="footnote">The Mac app can also use Apple's on-device model. It doesn't exist on Windows, so this version uses Claude only.</p>
 	{/if}
 </main>
 
@@ -258,6 +297,43 @@
 		border-radius: 6px;
 		padding: 3px 6px;
 		color-scheme: dark;
+	}
+	.saved {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		color: var(--secondary);
+	}
+	.remove {
+		color: #ff6961;
+		font-weight: 600;
+	}
+	.key-row {
+		display: flex;
+		gap: 8px;
+		padding: 7px 0;
+	}
+	.key-row input {
+		flex: 1;
+		font: inherit;
+		color: var(--label);
+		background: rgba(255, 255, 255, 0.08);
+		border: 0.5px solid rgba(255, 255, 255, 0.18);
+		border-radius: 7px;
+		padding: 5px 8px;
+		user-select: text;
+		-webkit-user-select: text;
+	}
+	.save {
+		padding: 4px 14px;
+		border-radius: 999px;
+		font-weight: 600;
+	}
+	.save:disabled {
+		opacity: 0.5;
+	}
+	.error {
+		color: #ff6961;
 	}
 	.mute {
 		display: flex;

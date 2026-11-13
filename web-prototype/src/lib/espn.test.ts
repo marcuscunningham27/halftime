@@ -2,7 +2,7 @@
 // Run with `npm test` (Node's own test runner, which reads TypeScript directly).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { possession, readable, brightness, baseballResult, probabilityChart, clockSeconds, type Play } from './espn.ts';
+import { possession, readable, brightness, baseballResult, probabilityChart, clockSeconds, orderLeagues, moveLeague, type Play } from './espn.ts';
 
 const play = (type: string, teamID: string, extra: Partial<Play> = {}): Play => ({ id: type, text: type, type, teamID, isScoring: false, isShot: false, period: 1, clock: '', ...extra });
 
@@ -46,4 +46,13 @@ test('probabilities are placed on the game clock', () => {
 	assert.deepEqual(chart.map((c) => Math.round(c.progress * 100) / 100), [0, 0.5, 1.1]);
 	assert.equal(clockSeconds('45.3'), 45.3);
 	assert.equal(clockSeconds('2:05'), 125);
+});
+
+test('leagues follow the saved order; ones not in it keep their place at the end', () => {
+	const all = ['nfl', 'cfb', 'nba', 'nhl', 'epl'].map((id) => ({ id }));
+	assert.deepEqual(orderLeagues(all, []).map((l) => l.id), ['nfl', 'cfb', 'nba', 'nhl', 'epl']);
+	assert.deepEqual(orderLeagues(all, ['nba', 'epl', 'nfl']).map((l) => l.id), ['nba', 'epl', 'nfl', 'cfb', 'nhl']);
+	assert.deepEqual(orderLeagues(all, ['gone', 'nhl']).map((l) => l.id), ['nhl', 'nfl', 'cfb', 'nba', 'epl']);
+	assert.deepEqual(moveLeague(['nfl', 'cfb', 'nba'], 'nba', 'nfl'), ['nba', 'nfl', 'cfb']);
+	assert.deepEqual(moveLeague(['nfl', 'cfb', 'nba'], 'nfl', undefined), ['cfb', 'nba', 'nfl']);
 });

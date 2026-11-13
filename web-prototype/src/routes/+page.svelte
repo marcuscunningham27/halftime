@@ -3,9 +3,12 @@
 	import Backdrop from '$lib/Backdrop.svelte';
 	import GlassPicker from '$lib/GlassPicker.svelte';
 	import ScoreCard from '$lib/ScoreCard.svelte';
-	import { leagues, leagueLogo, scoreboard, startOfDay, ordered, type Game } from '$lib/espn';
+	import { leagues as allLeagues, leagueLogo, scoreboard, startOfDay, ordered, orderLeagues, type Game } from '$lib/espn';
 	import { isFollowingTeam } from '$lib/follows.svelte';
+	import { settings } from '$lib/settings.svelte';
 
+	// Sections in the order dragged into in the sidebar.
+	const leagues = $derived(orderLeagues(allLeagues, settings.leagueOrder));
 	const days = ['Yesterday', 'Today', 'Upcoming'] as const;
 	let day = $state<(typeof days)[number]>('Today');
 	let games = $state<Game[] | undefined>();
@@ -17,7 +20,8 @@
 
 	async function refresh(forOffset = offset) {
 		try {
-			const result = (await Promise.all(leagues.map((l) => scoreboard(l, startOfDay(forOffset)).catch(() => [])))).flat();
+			// The fixed list: fetching doesn't care about order, and reading the ordered one would refetch on every reorder.
+			const result = (await Promise.all(allLeagues.map((l) => scoreboard(l, startOfDay(forOffset)).catch(() => [])))).flat();
 			if (forOffset === offset) [games, error] = [result, undefined];
 		} catch (e) {
 			error = String(e);

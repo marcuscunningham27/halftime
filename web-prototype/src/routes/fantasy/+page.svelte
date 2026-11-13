@@ -1,12 +1,12 @@
 <script lang="ts">
 	// FantasyView.swift: Lineup, Past Games, Upcoming, Season and News for the league picked from the title menu.
-	// shortcut: no AI week briefing (WeekOverviewCard) yet.
 	import Backdrop from '$lib/Backdrop.svelte';
 	import GlassPicker from '$lib/GlassPicker.svelte';
 	import LeagueSetup from '$lib/LeagueSetup.svelte';
 	import FantasyGames, { type Entry } from '$lib/FantasyGames.svelte';
 	import FantasySeason from '$lib/FantasySeason.svelte';
 	import FantasyNews from '$lib/FantasyNews.svelte';
+	import WeekBriefing from '$lib/WeekBriefing.svelte';
 	import { nflWeek, summary, type Game, type GameDetail } from '$lib/espn';
 	import * as F from '$lib/fantasy';
 
@@ -34,6 +34,8 @@
 		news: Record<string, F.News[]>;
 	};
 	let base = $state<Base | undefined>();
+	/** The week briefing, kept here so switching tabs doesn't rewrite it; cleared on each load. */
+	let briefing = $state<string | undefined>();
 	let error = $state<string | undefined>();
 
 	// Each team's bye, from the 18 regular-season weeks; fetched once per season.
@@ -77,6 +79,7 @@
 	$effect(() => {
 		base = undefined;
 		error = undefined;
+		briefing = undefined;
 		past = undefined;
 		season = undefined;
 		chosenWeek = undefined;
@@ -192,7 +195,8 @@
 						{/each}
 					{/if}
 				{/each}
-				<hr />
+				<!-- Only separates leagues from Manage Leagues…; with none added it would sit alone at the top. -->
+				{#if leagues.length}<hr />{/if}
 				<button role="menuitem" onclick={() => ((managing = true), (menuOpen = false))}><span class="check"></span>Manage Leagues…</button>
 			</div>
 		{/if}
@@ -297,6 +301,7 @@
 				{/if}
 			</section>
 		{/if}
+		<WeekBriefing team={base.team} week={base.week} matchup={base.matchup} projections={base.projections} byes={base.byes} news={base.news} bind:briefing />
 		<section class="card">
 			{@render columns('Starters', base.week)}
 			{#each base.team.lineup as slot}{@render row(slot.label, slot.player, base)}{/each}

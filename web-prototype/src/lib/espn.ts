@@ -25,6 +25,23 @@ export const leagues: League[] = [
 	{ id: 'mls', name: 'Major League Soccer', abbreviation: 'MLS', path: 'soccer/usa.1', sport: 'soccer', regulationPeriods: 2, periodStyle: 'halves' }
 ];
 
+/** Leagues in the order the person dragged them into in the sidebar; any not in `order` (new ones) follow in their
+ *  usual place. Home lists its sections in the same order (League.ordered). */
+export function orderLeagues<T extends { id: string }>(all: T[], order: string[]): T[] {
+	const rank = (l: T) => {
+		const i = order.indexOf(l.id);
+		return i < 0 ? order.length + all.indexOf(l) : i;
+	};
+	return [...all].sort((a, b) => rank(a) - rank(b));
+}
+
+/** The order after dragging `id` to sit before `before` (or to the end when undefined). */
+export function moveLeague(ids: string[], id: string, before: string | undefined): string[] {
+	const rest = ids.filter((x) => x !== id);
+	const at = before === undefined ? rest.length : rest.indexOf(before);
+	return [...rest.slice(0, at < 0 ? rest.length : at), id, ...rest.slice(at < 0 ? rest.length : at)];
+}
+
 const soccerLogoIDs: Record<string, number> = { epl: 23, ucl: 2, mls: 19 };
 /** Soccer league logos live under ESPN's numeric league IDs; college football has its own icon (League.logoURL). */
 export const leagueLogo = (l: League) =>
@@ -227,9 +244,9 @@ export type Play = {
 	isShot: boolean;
 };
 export type Drive = { id: string; teamID?: string; summary: string; result?: string; isScore: boolean; plays: Play[] };
-export type BoxScore = { teamID: string; title: string; labels: string[]; rows: { id: string; name: string; stats: string[] }[] };
+export type BoxScore = { teamID: string; category: string; title: string; labels: string[]; rows: { id: string; name: string; stats: string[] }[] };
 export type TeamStat = { label: string; away: string; home: string };
-export type Leader = { teamID: string; category: string; athlete: string; shortName?: string; position?: string; headshot?: string; mainValue?: string; summary?: string };
+export type Leader = { teamID: string; category: string; athlete: string; line: string; shortName?: string; position?: string; headshot?: string; mainValue?: string; summary?: string };
 export type Overview = {
 	venue?: { name: string; place?: string; city?: string; region?: string; image?: string };
 	attendance?: number;
@@ -295,8 +312,9 @@ export async function summary(game: Game): Promise<GameDetail> {
 		boxScores: (s.boxscore?.players ?? []).flatMap((team: any) =>
 			(team.statistics ?? [])
 				.filter((c: any) => c.labels?.length)
-				.map((c: any) => ({
+				.map((c: any, i: number) => ({
 					teamID: team.team.id,
+					category: c.name ?? `players-${i}`,
 					title: c.text ?? `${team.team.displayName} ${c.name}`,
 					labels: c.labels,
 					rows: (c.athletes ?? []).filter((a: any) => a.stats).map((a: any) => ({ id: a.athlete.id, name: a.athlete.displayName, stats: a.stats }))
@@ -465,6 +483,7 @@ function overview(s: any): Overview {
 					teamID: team.team.id,
 					category: c.displayName ?? '',
 					athlete: top.athlete.displayName,
+					line: top.displayValue ?? '',
 					shortName: top.athlete.shortName,
 					position: top.athlete.position?.abbreviation,
 					headshot: top.athlete.headshot?.href,

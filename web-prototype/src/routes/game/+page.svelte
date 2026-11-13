@@ -1,6 +1,5 @@
 <script lang="ts">
 	// GameDetailView.swift: header, NFL Gamecast, recap, then Overview / Stats / Play-By-Play / Box Score.
-	// shortcut: no Ask About the Game card or AI summary yet.
 	import { page } from '$app/state';
 	import Backdrop from '$lib/Backdrop.svelte';
 	import FieldView from '$lib/FieldView.svelte';
@@ -9,6 +8,8 @@
 	import Pitch from '$lib/Pitch.svelte';
 	import Diamond from '$lib/Diamond.svelte';
 	import Gamecast from '$lib/Gamecast.svelte';
+	import RecapCard from '$lib/RecapCard.svelte';
+	import AskCard from '$lib/AskCard.svelte';
 	import Football from '$lib/Football.svelte';
 	import GlassPicker from '$lib/GlassPicker.svelte';
 	import FollowButton from '$lib/FollowButton.svelte';
@@ -33,7 +34,6 @@
 	let detail = $state<GameDetail | undefined>();
 	const tabs = ['Overview', 'Stats', 'Play-By-Play', 'Box Score'] as const;
 	let tab = $state<(typeof tabs)[number] | undefined>();
-	let recapOpen = $state(false);
 	const drives = $derived(detail?.drives);
 	let error = $state<string | undefined>();
 
@@ -147,16 +147,9 @@
 			<Gamecast {game} {plays} court={detail?.court}><Pitch {game} shots={detail.shots} teamStats={detail.teamStats} /></Gamecast>
 		{/if}
 
-		{#if detail?.overview.recap}
-			{@const recap = detail.overview.recap}
-			<section class="sports-card recap">
-				<h2>Recap</h2>
-				<strong class="headline">{recap.headline}</strong>
-				{#each recapOpen ? recap.paragraphs : recap.paragraphs.slice(0, 2) as paragraph}<p>{paragraph}</p>{/each}
-				{#if recap.paragraphs.length > 2}
-					<button class="more" onclick={() => (recapOpen = !recapOpen)}>{recapOpen ? 'Show Less' : 'Read More'}</button>
-				{/if}
-			</section>
+		{#if detail}
+			<RecapCard {game} {detail} />
+			<AskCard {game} {detail} />
 		{/if}
 
 		{#if tab}
@@ -300,20 +293,6 @@
 		font-weight: 600;
 	}
 	.linescore .total {
-		font-weight: 600;
-	}
-	.recap .headline {
-		font-size: var(--title3);
-	}
-	.recap p {
-		margin: 8px 0 0;
-		line-height: 1.45;
-		user-select: text;
-		-webkit-user-select: text;
-	}
-	.more {
-		margin-top: 8px;
-		color: #64a8ff;
 		font-weight: 600;
 	}
 	.tabs {

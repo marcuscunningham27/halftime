@@ -11,7 +11,8 @@ export type Provider = 'sleeper' | 'espn';
 export type LeagueRef = { provider: Provider; leagueID: string; name: string; memberID: string };
 export type Credentials = { espnS2: string; swid: string };
 
-// Saved leagues. shortcut: ESPN cookies sit in localStorage in plain text; move them to the Keychain / Credential Manager (a keyring plugin) before shipping.
+// Saved leagues in localStorage; ESPN's private-league cookies in the Keychain / Credential Manager (secrets.ts).
+import { getSecret, setSecret } from './secrets.ts';
 const read = <T>(key: string, fallback: T): T => {
 	try {
 		return JSON.parse(localStorage.getItem(key) ?? '') as T;
@@ -24,9 +25,17 @@ export const store = {
 	saveLeagues: (l: LeagueRef[]) => localStorage.setItem('fantasyLeagues', JSON.stringify(l)),
 	activeID: (): string | null => localStorage.getItem('fantasyActive'),
 	setActive: (id: string) => localStorage.setItem('fantasyActive', id),
-	credentials: (leagueID: string): Credentials | undefined => read(`espnCookies:${leagueID}`, undefined),
-	setCredentials: (leagueID: string, c?: Credentials) =>
-		c ? localStorage.setItem(`espnCookies:${leagueID}`, JSON.stringify(c)) : localStorage.removeItem(`espnCookies:${leagueID}`)
+	async credentials(leagueID: string): Promise<Credentials | undefined> {
+		// The first version kept cookies in plain localStorage; move any found there into the secret store once.
+		const old = read<Credentials | undefined>(`espnCookies:${leagueID}`, undefined);
+		if (old) {
+			await setSecret(`espn:${leagueID}`, JSON.stringify(old));
+			localStorage.removeItem(`espnCookies:${leagueID}`);
+		}
+		const saved = await getSecret(`espn:${leagueID}`);
+		return saved ? (JSON.parse(saved) as Credentials) : undefined;
+	},
+	setCredentials: (leagueID: string, c?: Credentials) => setSecret(`espn:${leagueID}`, c ? JSON.stringify(c) : undefined)
 };
 export const refID = (l: LeagueRef) => `${l.provider}:${l.leagueID}`;
 
@@ -166,7 +175,8 @@ export class PrivateLeagueError extends Error {
 const inTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 /** In the desktop app ESPN goes through Rust, which may send the Cookie header a browser page can't. */
-async function espnFetch(leagueID: string, season: string, views: string[], week?: number, credentials?: Credentials): Promise<any> {
+async function espnFetch(leagueID: string, season: string, views: string[], week?: number, given?: Credentials): Promise<any> {
+	const credentials = given ?? (await store.credentials(leagueID));
 	const query = views.map((v) => `view=${v}`).concat(week ? [`scoringPeriodId=${week}`] : []).join('&');
 	const url = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${season}/segments/0/leagues/${leagueID}?${query}`;
 	const headers: Record<string, string> = credentials ? { Cookie: `espn_s2=${credentials.espnS2}; SWID=${credentials.swid}` } : {};
@@ -258,19 +268,19 @@ async function espnMatchup(leagueID: string, season: string, teamID: string, wee
 // MARK: Dispatch, as FantasyData.
 
 export async function team(l: LeagueRef, season: string): Promise<Team> {
-	const t = l.provider === 'sleeper' ? await sleeperTeam(l.leagueID, l.memberID) : await espnTeam(l.leagueID, season, l.memberID, store.credentials(l.leagueID));
+	const t = l.provider === 'sleeper' ? await sleeperTeam(l.leagueID, l.memberID) : await espnTeam(l.leagueID, season, l.memberID);
 	if (!t) throw new Error('You don’t have a team in this league.');
 	return t;
 }
 
 export const projections = (l: LeagueRef, season: string, week: number) =>
-	l.provider === 'sleeper' ? sleeperProjections(l.leagueID, season, week) : espnPoints(l.leagueID, season, week, 1, store.credentials(l.leagueID));
+	l.provider === 'sleeper' ? sleeperProjections(l.leagueID, season, week) : espnPoints(l.leagueID, season, week, 1);
 
 export const points = (l: LeagueRef, season: string, week: number) =>
-	l.provider === 'sleeper' ? sleeperPoints(l.leagueID, week) : espnPoints(l.leagueID, season, week, 0, store.credentials(l.leagueID));
+	l.provider === 'sleeper' ? sleeperPoints(l.leagueID, week) : espnPoints(l.leagueID, season, week, 0);
 
 export const matchup = (l: LeagueRef, season: string, week: number, proj: Record<string, number>) =>
-	l.provider === 'sleeper' ? sleeperMatchup(l.leagueID, l.memberID, week, proj) : espnMatchup(l.leagueID, season, l.memberID, week, proj, store.credentials(l.leagueID));
+	l.provider === 'sleeper' ? sleeperMatchup(l.leagueID, l.memberID, week, proj) : espnMatchup(l.leagueID, season, l.memberID, week, proj);
 
 /** Injury severity, 0 healthy … 4 season-ending, for the status tag's colour. */
 export function severity(i?: Injury): number {
@@ -324,7 +334,7 @@ export async function season(l: LeagueRef, seasonYear: string, weeks: number[]):
 	// Sleeper names starters by ID only; its player list fills in names, including players since dropped.
 	const players = l.provider === 'sleeper' ? await sleeperPlayers() : {};
 	const results = await Promise.all(
-		weeks.map((w) => (l.provider === 'sleeper' ? sleeperWeek(l.leagueID, l.memberID, seasonYear, w, players) : espnWeek(l.leagueID, seasonYear, l.memberID, w, store.credentials(l.leagueID))))
+		weeks.map((w) => (l.provider === 'sleeper' ? sleeperWeek(l.leagueID, l.memberID, seasonYear, w, players) : espnWeek(l.leagueID, seasonYear, l.memberID, w)))
 	);
 	return results.filter((r): r is WeekResult => !!r);
 }
@@ -378,7 +388,7 @@ export async function standings(l: LeagueRef, seasonYear: string): Promise<Stand
 			};
 		});
 	} else {
-		const d = await espnFetch(l.leagueID, seasonYear, ['mTeam'], undefined, store.credentials(l.leagueID));
+		const d = await espnFetch(l.leagueID, seasonYear, ['mTeam'], undefined);
 		rows = (d.teams ?? []).map((t: any) => {
 			const r = t.record?.overall ?? {};
 			return { id: String(t.id), teamName: espnTeamName(t), wins: r.wins ?? 0, losses: r.losses ?? 0, ties: r.ties ?? 0, pointsFor: r.pointsFor ?? 0, isMine: String(t.id) === l.memberID };
@@ -396,7 +406,7 @@ export async function calendar(l: LeagueRef, state: NFLState): Promise<Calendar>
 		// A deadline past the regular season (Sleeper uses 99) means there isn't one.
 		return { playoffWeekStart: s.playoff_week_start ?? 15, tradeDeadlineWeek: s.trade_deadline > 0 && s.trade_deadline < 19 ? s.trade_deadline : undefined };
 	}
-	const s = (await espnFetch(l.leagueID, state.season, ['mSettings'], undefined, store.credentials(l.leagueID))).settings;
+	const s = (await espnFetch(l.leagueID, state.season, ['mSettings'], undefined)).settings;
 	const deadline = s?.tradeSettings?.deadlineDate;
 	return { playoffWeekStart: (s?.scheduleSettings?.matchupPeriodCount ?? 14) + 1, tradeDeadlineWeek: deadline > 0 ? weekOf(new Date(deadline), state) : undefined };
 }
