@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { leagues, leagueLogo } from '$lib/espn';
 	let { children } = $props();
 	// In the Tauri window the title bar is transparent, so the sidebar leaves room for the traffic lights.
 	const inTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -7,8 +8,14 @@
 		{ href: '/', title: 'Home', icon: 'M3 8.5 10 3l7 5.5V17h-4.5v-5h-5v5H3z' },
 		{ href: '/fantasy', title: 'Fantasy', icon: 'M10 2.5l2.2 4.6 5 .6-3.7 3.5 1 5L10 13.8 5.5 16.2l1-5L2.8 7.7l5-.6z' }
 	];
-	// A game page belongs to Home.
-	const current = $derived(page.url.pathname.startsWith('/fantasy') ? '/fantasy' : '/');
+	// A game page belongs to Home; a team page to its league.
+	const current = $derived(
+		page.url.pathname.startsWith('/fantasy') ? '/fantasy'
+		: page.url.pathname.startsWith('/league') ? `/league?league=${page.url.searchParams.get('league')}`
+		: '/'
+	);
+	// shortcut: lists every league until following lands; the Swift sidebar shows followed leagues and teams.
+	const leagueItems = leagues.map((l) => ({ href: `/league?league=${l.id}`, title: l.abbreviation, logo: leagueLogo(l) }));
 </script>
 
 <div class="app" class:tauri={inTauri}>
@@ -17,6 +24,13 @@
 		{#each items as item}
 			<a href={item.href} class:on={current === item.href} aria-current={current === item.href ? 'page' : undefined}>
 				<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d={item.icon} fill="currentColor" /></svg>
+				{item.title}
+			</a>
+		{/each}
+		<hr />
+		{#each leagueItems as item}
+			<a href={item.href} class:on={current === item.href} aria-current={current === item.href ? 'page' : undefined}>
+				<img src={item.logo} alt="" width="16" height="16" />
 				{item.title}
 			</a>
 		{/each}
@@ -141,6 +155,15 @@
 		border-radius: 8px;
 		font-weight: 500;
 	}
+	.sidebar hr {
+		border: 0;
+		border-top: 1px solid var(--separator);
+		margin: 6px 10px;
+	}
+	/* A thin white halo keeps dark logos (the Premier League's) visible on the glass. */
+	.sidebar a img {
+		filter: drop-shadow(0 0 0.6px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 1.2px rgba(255, 255, 255, 0.5));
+	}
 	.sidebar a svg {
 		color: var(--secondary);
 	}
@@ -170,6 +193,9 @@
 	@media (max-width: 640px) {
 		.app {
 			--sidebar: 0px;
+		}
+		.sidebar hr {
+			display: none;
 		}
 		.sidebar {
 			top: auto;

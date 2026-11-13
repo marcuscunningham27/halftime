@@ -89,7 +89,7 @@
 			{#if hasBall(game!, c)}<Football />{/if}
 		</div>
 		<img src={c.team.logo} alt="" width="48" height="48" />
-		<strong>{c.team.shortName}</strong>
+		<a class="team-name" href="/league?league={league.id}&team={c.team.id}"><strong>{c.team.shortName}</strong></a>
 		{#if c.record}<span class="secondary">{c.record}</span>{/if}
 	</div>
 {/snippet}
@@ -226,6 +226,9 @@
 	}
 	.digits {
 		font: 700 72px/1 'Chakra Petch', sans-serif;
+	}
+	.team-name:hover {
+		text-decoration: underline;
 	}
 	.winner {
 		font-size: 12px;

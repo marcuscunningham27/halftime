@@ -9,7 +9,9 @@ export const leagues: League[] = [
 	{ id: 'epl', abbreviation: 'EPL', path: 'soccer/eng.1', regulationPeriods: 2, periodStyle: 'halves' }
 ];
 
-export const leagueLogo = (l: League) => `https://a.espncdn.com/i/teamlogos/leagues/500/${l.id === 'epl' ? 'eng.1' : l.id}.png`;
+/** Soccer league logos live under ESPN's numeric league IDs (League.logoURL). */
+export const leagueLogo = (l: League) =>
+	l.id === 'epl' ? 'https://a.espncdn.com/i/leaguelogos/soccer/500/23.png' : `https://a.espncdn.com/i/teamlogos/leagues/500/${l.id}.png`;
 
 export type Team = { id: string; abbreviation: string; displayName: string; shortName: string; color?: string; alternateColor?: string; logo?: string };
 export type Competitor = { team: Team; score?: number; record?: string; periodScores: number[] };
@@ -534,4 +536,56 @@ export function readable(h: string, boost = 1): string {
 		else high = mid;
 	}
 	return brightness(h, low);
+}
+
+// League pages: standings, recent results and the days ahead, as ESPNProvider.
+
+export type Standings = { columns: string[]; groups: { name: string; entries: { team: Team; values: string[] }[] }[] };
+
+/** Which ESPN stats each league's table shows, how it's ranked (higher is better, in order), and whether to split by division. */
+const standingsSpecs: Record<string, { level?: number; columns: [string, string][]; rankBy: string[] }> = {
+	nfl: { level: 3, columns: [['wins', 'W'], ['losses', 'L'], ['ties', 'T'], ['winPercent', 'PCT']], rankBy: ['winPercent', 'wins'] },
+	nba: { columns: [['wins', 'W'], ['losses', 'L'], ['winPercent', 'PCT'], ['gamesBehind', 'GB']], rankBy: ['winPercent', 'wins'] },
+	nhl: { level: 3, columns: [['gamesPlayed', 'GP'], ['wins', 'W'], ['losses', 'L'], ['otLosses', 'OTL'], ['points', 'PTS']], rankBy: ['points', 'wins'] },
+	epl: { columns: [['gamesPlayed', 'GP'], ['wins', 'W'], ['ties', 'D'], ['losses', 'L'], ['pointDifferential', 'GD'], ['points', 'PTS']], rankBy: ['points', 'pointDifferential', 'pointsFor'] }
+};
+
+export async function standings(league: League): Promise<Standings> {
+	const spec = standingsSpecs[league.id];
+	// Standings live under /apis/v2, not the site API. Level 3 splits conferences into divisions.
+	const root = await get(`https://site.api.espn.com/apis/v2/sports/${league.path}/standings${spec.level ? `?level=${spec.level}` : ''}`);
+	const stat = (e: any, name: string) => e.stats?.find((s: any) => s.name === name);
+	// Groups are whichever nodes carry entries: conferences, divisions, or the whole league.
+	const groups = (node: any): Standings['groups'] => {
+		const entries: any[] | undefined = node.standings?.entries;
+		if (!entries) return (node.children ?? []).flatMap(groups);
+		const ranked = [...entries].sort((a, b) => {
+			for (const name of spec.rankBy) {
+				const x = stat(a, name)?.value ?? -Infinity, y = stat(b, name)?.value ?? -Infinity;
+				if (x !== y) return y - x;
+			}
+			return 0;
+		});
+		return [{ name: node.name ?? '', entries: ranked.map((e) => ({ team: parseTeam(e.team), values: spec.columns.map(([name]) => stat(e, name)?.displayValue ?? '–') })) }];
+	};
+	return { columns: spec.columns.map(([, label]) => label), groups: groups(root) };
+}
+
+/** The league's most recent finals, newest first: the current slate, else stepping back a day at a time, up to a week. */
+export async function recentResults(league: League, before: Date): Promise<Game[]> {
+	let finals = (await get(`${base}${league.path}/scoreboard`)).events?.map((e: any) => parseEvent(e, league)).filter((g: Game) => g.status === 'final') ?? [];
+	for (let back = 1; back <= 7 && finals.length === 0; back++) {
+		const day = new Date(before);
+		day.setHours(0, 0, 0, 0);
+		day.setDate(day.getDate() - back);
+		finals = (await scoreboard(league, day)).filter((g) => g.status === 'final');
+	}
+	return finals.sort((a: Game, b: Game) => b.startDate.getTime() - a.startDate.getTime());
+}
+
+/** Every game on the next `days` days, without repeats. */
+export async function upcoming(league: League, days: number): Promise<Game[]> {
+	const pages = await Promise.all(Array.from({ length: days }, (_, i) => scoreboard(league, startOfDay(i + 1)).catch(() => [])));
+	const seen = new Set<string>();
+	return pages.flat().filter((g) => g.status === 'scheduled' && !seen.has(g.id) && seen.add(g.id)).sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
 }

@@ -59,7 +59,7 @@
 				{@const leagueGames = ordered(games.filter((g) => g.league.id === league.id))}
 				{#if leagueGames.length}
 					{#if i > 0 && games.some((g) => leagues.indexOf(g.league) < i)}<hr class="section" />{/if}
-					<h2><img src={leagueLogo(league)} alt="" width="20" height="20" />{league.abbreviation}</h2>
+					<h2><a href="/league?league={league.id}"><img src={leagueLogo(league)} alt="" width="20" height="20" />{league.abbreviation}<svg class="chevron" viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" /></svg></a></h2>
 					{#each leagueGames as game, j (game.id)}
 						{#if j > 0}<hr />{/if}
 						<a href="/game?league={league.id}&id={game.id}&day={startOfDay(offset).getTime()}" class="row"><ScoreCard {game} /></a>
@@ -142,6 +142,14 @@
 		margin: 10px 0 0;
 		font-size: var(--headline);
 		font-weight: 700;
+	}
+	h2 a {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+	.chevron {
+		color: var(--secondary);
 	}
 	h2 img {
 		filter: drop-shadow(0 0 0.6px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 1.2px rgba(255, 255, 255, 0.5));
