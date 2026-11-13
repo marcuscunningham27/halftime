@@ -6,7 +6,7 @@ import SwiftUI
 /// and next week's games. Works the same for every provider through `FantasyData`.
 struct FantasyView: View {
     enum Tab: String, CaseIterable, Identifiable {
-        case lineup = "Lineup", past = "Past Week", upcoming = "Upcoming", season = "Season", news = "News"
+        case lineup = "Lineup", past = "Past Games", upcoming = "Upcoming", season = "Season", news = "News"
         var id: Self { self }
     }
 

@@ -67,7 +67,7 @@ All 8 phases of the spec are done, plus a lot of extra design work.
     - A matchup card: actual points in big type, PROJ beneath, and a win chance bar.
     - A Week Briefing (AI, only when the user clicks "Brief Me"), then linked news stories.
     - Starters and bench with status, bye week, news, and Proj and last-week columns.
-  - **Past Week:** a week picker, games, and your players' ESPN stat lines and points.
+  - **Past Games:** a week picker (latest played week first, often the current one), games, and your players' ESPN stat lines and points.
   - **Upcoming:** next week's games, with dates.
   - **Season:** trend tiles, a projected-vs-actual chart with hover, gaps by position and by starter, and
     standings (your row is a green glass capsule).
