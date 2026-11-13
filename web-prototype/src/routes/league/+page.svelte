@@ -196,12 +196,7 @@
 
 <style>
 	header {
-		position: sticky;
-		top: 0;
-		z-index: 2;
 		min-height: 52px;
-		display: flex;
-		align-items: center;
 		justify-content: space-between;
 		gap: 12px;
 		padding: 6px 16px 6px var(--titlebar-inset);
@@ -254,13 +249,6 @@
 	}
 	.group button:disabled {
 		color: var(--tertiary);
-	}
-	.round {
-		width: 32px;
-		height: 32px;
-		border-radius: 50%;
-		display: grid;
-		place-items: center;
 	}
 	main {
 		max-width: 760px;

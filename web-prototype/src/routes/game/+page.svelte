@@ -175,25 +175,11 @@
 
 <style>
 	header {
-		position: sticky;
-		top: 0;
-		z-index: 2;
-		height: 52px;
-		display: flex;
-		align-items: center;
 		gap: 12px;
-		padding: 0 16px 0 var(--titlebar-inset);
 	}
 	.title {
 		font-size: 15px;
 		font-weight: 700;
-	}
-	.round {
-		width: 32px;
-		height: 32px;
-		border-radius: 50%;
-		display: grid;
-		place-items: center;
 	}
 	main {
 		max-width: 760px;

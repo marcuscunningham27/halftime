@@ -2,7 +2,7 @@
 // Manager through the Rust commands in src-tauri/src/lib.rs. A website has no such store, so there they last only
 // for the browser session (sessionStorage) and are typed again next visit.
 
-const inTauri = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+import { inTauri } from './platform.ts';
 const invoke = async <T>(cmd: string, args: Record<string, string>) => (await import('@tauri-apps/api/core')).invoke<T>(cmd, args);
 
 export async function getSecret(name: string): Promise<string | undefined> {

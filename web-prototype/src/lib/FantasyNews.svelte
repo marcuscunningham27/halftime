@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { openInBrowser } from './platform';
 	// FantasyNewsView: who's out or on bye, the weeks ahead where byes leave a starting slot nobody can fill, an injury
 	// report across the roster, and the latest news.
 	import { type Team, type Player, type Calendar, type News, type CoverSlot, severity, lineupCover, needsCover } from './fantasy';
@@ -57,12 +58,6 @@
 	const rank = (p: Player) => (p.injury ? sev(p) : onBye(p) ? 0 : -1);
 	const report = $derived([...players].sort((a, b) => rank(b) - rank(a) || a.name.localeCompare(b.name)));
 
-	/** In the desktop app a link would replace the app's own page, so stories open in the default browser instead. */
-	async function openStory(e: MouseEvent, url: string) {
-		if (!('__TAURI_INTERNALS__' in window)) return;
-		e.preventDefault();
-		(await import('@tauri-apps/plugin-opener')).openUrl(url);
-	}
 
 	const ago = (d: Date) => {
 		const hours = Math.round((Date.now() - d.getTime()) / 3_600_000);
@@ -150,7 +145,7 @@
 			{#if i > 0}<hr />{/if}
 			<div class="story">
 				<span class="caption">{p.name} · {n.source} · {ago(n.published)}</span>
-				{#if n.url}<a href={n.url} target="_blank" rel="noopener noreferrer" onclick={(e) => openStory(e, n.url!)}><strong>{n.headline}</strong></a>{:else}<strong>{n.headline}</strong>{/if}
+				{#if n.url}<a href={n.url} target="_blank" rel="noopener noreferrer" onclick={(e) => openInBrowser(e, n.url)}><strong>{n.headline}</strong></a>{:else}<strong>{n.headline}</strong>{/if}
 				{#if n.story}<p class="caption clamp">{n.story}</p>{/if}
 			</div>
 		{/each}

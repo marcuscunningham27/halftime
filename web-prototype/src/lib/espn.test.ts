@@ -2,7 +2,7 @@
 // Run with `npm test` (Node's own test runner, which reads TypeScript directly).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { possession, readable, brightness, baseballResult, probabilityChart, clockSeconds, orderLeagues, moveLeague, type Play } from './espn.ts';
+import { possession, readable, brightness, baseballResult, probabilityChart, clockSeconds, orderLeagues, moveLeague, fieldState, type Play } from './espn.ts';
 
 const play = (type: string, teamID: string, extra: Partial<Play> = {}): Play => ({ id: type, text: type, type, teamID, isScoring: false, isShot: false, period: 1, clock: '', ...extra });
 
@@ -55,4 +55,23 @@ test('leagues follow the saved order; ones not in it keep their place at the end
 	assert.deepEqual(orderLeagues(all, ['gone', 'nhl']).map((l) => l.id), ['nhl', 'nfl', 'cfb', 'nba', 'epl']);
 	assert.deepEqual(moveLeague(['nfl', 'cfb', 'nba'], 'nba', 'nfl'), ['nba', 'nfl', 'cfb']);
 	assert.deepEqual(moveLeague(['nfl', 'cfb', 'nba'], 'nfl', undefined), ['cfb', 'nba', 'nfl']);
+});
+
+test('the field draws the ball and the line to gain toward the end zone each offence attacks', () => {
+	const nfl = { id: 'nfl', sport: 'football', regulationPeriods: 4, periodStyle: 'quarters' };
+	const team = (id) => ({ id, abbreviation: id, displayName: id, shortName: id });
+	const game = (offense) => ({
+		id: '1', league: nfl, status: 'live', period: 2, clock: '5:00', statusDetail: '', statusName: '', broadcasts: [], startDate: new Date(),
+		home: { team: team('H'), score: 0, periodScores: [] }, away: { team: team('A'), score: 0, periodScores: [] },
+		situation: { possessionTeamID: offense, yardLine: 30, distance: 10, shortDownAndDistance: '1st & 10 · H 30' }
+	});
+	// Yard lines run from the home goal: the home offence gains toward the away goal (rising), the away offence the other way.
+	assert.equal(fieldState(game('H'), []).lineToGain, 40);
+	assert.equal(fieldState(game('A'), []).lineToGain, 20);
+	assert.equal(fieldState(game('A'), []).down, '1st & 10');
+	assert.equal(fieldState(game('A'), []).ballOn, 'H 30');
+	// After the whistle the field shows where the last snap ended.
+	const drive = { id: 'd', teamID: 'A', summary: '3 plays, 13 yards, 0:25', isScore: false, plays: [play('Rush', 'A', { id: 'r', spot: '2nd & 11 at A 10', startYardLine: 90, endYardLine: 75 })] };
+	const final = fieldState({ ...game('A'), status: 'final' }, [drive]);
+	assert.deepEqual([final.ball, final.down, final.drive], [75, '2nd & 11', '3 plays, 13 yds']);
 });

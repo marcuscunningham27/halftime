@@ -1,6 +1,7 @@
 <script lang="ts">
 	// ContentView.swift's sidebar: Home and Fantasy, search, followed leagues then teams, every league, Settings.
 	import { page } from '$app/state';
+	import { inTauri as isTauri } from '$lib/platform';
 	import { leagues, leagueLogo, allTeams, orderLeagues, moveLeague, type League, type Team } from '$lib/espn';
 	import { settings, saveSettings } from '$lib/settings.svelte';
 	import { follows } from '$lib/follows.svelte';
@@ -8,7 +9,9 @@
 	import { startLive, refreshLive } from '$lib/live';
 	let { children } = $props();
 	// In the Tauri window the title bar is transparent, so the sidebar leaves room for the traffic lights.
-	const inTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+	const inTauri = isTauri();
+	// The menu-bar panel is its own window: no sidebar, and the poller runs in the main window only.
+	const isPanel = page.url.pathname === '/tray';
 	const items = [
 		{ href: '/', title: 'Home', icon: 'M3 8.5 10 3l7 5.5V17h-4.5v-5h-5v5H3z' },
 		{ href: '/fantasy', title: 'Fantasy', icon: 'M10 2.5l2.2 4.6 5 .6-3.7 3.5 1 5L10 13.8 5.5 16.2l1-5L2.8 7.7l5-.6z' }
@@ -35,11 +38,11 @@
 	const matchingTeams = $derived(teams.filter(({ team }) => team.displayName.toLowerCase().includes(text) || team.abbreviation.toLowerCase() === text));
 	// The desktop app's menu-bar item and alerts run for as long as the app does; a new star updates the tray at once.
 	$effect(() => {
-		if (inTauri) startLive();
+		if (inTauri && !isPanel) startLive();
 	});
 	$effect(() => {
 		JSON.stringify(follows);
-		if (inTauri) refreshLive();
+		if (inTauri && !isPanel) refreshLive();
 	});
 	// Leagues in the order dragged into below; Home lists its sections the same way.
 	const ordered = $derived(orderLeagues(leagues, settings.leagueOrder));
@@ -73,6 +76,9 @@
 	});
 </script>
 
+{#if isPanel}
+	{@render children()}
+{:else}
 <div class="app" class:tauri={inTauri}>
 	<!-- The macOS 26 sidebar: a floating glass panel inset from the window edge, over the page's colour. -->
 	<nav class="sidebar glass" data-tauri-drag-region>
@@ -158,6 +164,7 @@
 	</nav>
 	<div class="content">{@render children()}</div>
 </div>
+{/if}
 
 <style>
 	@font-face {
@@ -178,7 +185,6 @@
 		--subheadline: 11px;
 		--caption: 10px;
 		--title3: 15px;
-		--sports-green: #2d6526;
 		--glass: rgba(255, 255, 255, 0.06);
 		--glass-edge: rgba(255, 255, 255, 0.22);
 	}
@@ -387,6 +393,26 @@
 	}
 	.content {
 		margin-left: var(--sidebar);
+	}
+	/* Every page's title bar: sticky, clear of the traffic lights in the desktop app. Pages add their own layout. */
+	.content :global(> header) {
+		position: sticky;
+		top: 0;
+		z-index: 2;
+		min-height: 52px;
+		display: flex;
+		align-items: center;
+		padding: 0 16px 0 var(--titlebar-inset);
+		box-sizing: border-box;
+	}
+	/* A round glass toolbar button (refresh, back). */
+	:global(.round) {
+		width: 32px;
+		height: 32px;
+		border-radius: 50%;
+		display: grid;
+		place-items: center;
+		flex: none;
 	}
 	/* SwiftUI's soft scroll edge: content blurs as it slides under a page's sticky header. Blur only, no tint, so an
 	   unscrolled page shows no band and the top meets the sidebar in one colour. */

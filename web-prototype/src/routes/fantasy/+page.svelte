@@ -283,7 +283,7 @@
 		{:else}
 		{#if base.matchup}
 			{@const chance = F.winProbability(base.matchup)}
-			<section class="card">
+			<section class="sports-card">
 				<h2>Week {base.week} Matchup</h2>
 				<div class="matchup">
 					{@render side(base.matchup.me, true)}
@@ -302,12 +302,12 @@
 			</section>
 		{/if}
 		<WeekBriefing team={base.team} week={base.week} matchup={base.matchup} projections={base.projections} byes={base.byes} news={base.news} bind:briefing />
-		<section class="card">
+		<section class="sports-card">
 			{@render columns('Starters', base.week)}
 			{#each base.team.lineup as slot}{@render row(slot.label, slot.player, base)}{/each}
 		</section>
 		{#if base.team.bench.length}
-			<section class="card bench">
+			<section class="sports-card bench">
 				{@render columns('Bench', base.week)}
 				{#each base.team.bench as p (p.id)}{@render row('BN', p, base)}{/each}
 			</section>
@@ -318,14 +318,7 @@
 
 <style>
 	header {
-		position: sticky;
-		top: 0;
-		z-index: 2;
-		height: 52px;
-		display: flex;
-		align-items: center;
 		justify-content: space-between;
-		padding: 0 16px 0 var(--titlebar-inset);
 	}
 	.menu {
 		position: relative;
@@ -381,13 +374,6 @@
 		border-top: 1px solid var(--separator);
 		margin: 4px 8px;
 	}
-	.round {
-		width: 32px;
-		height: 32px;
-		border-radius: 50%;
-		display: grid;
-		place-items: center;
-	}
 	main {
 		max-width: 760px;
 		margin: 0 auto;
@@ -396,12 +382,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 16px;
-	}
-	.card {
-		padding: 12px 16px;
-		border-radius: 22px;
-		background: rgba(0, 0, 0, 0.38);
-		box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
 	}
 	h2 {
 		margin: 0;

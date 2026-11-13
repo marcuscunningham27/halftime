@@ -23,12 +23,38 @@
           "x": 24,
           "y": 26
         },
-        "dragDropEnabled": false
+        "dragDropEnabled": false,
+        "label": "main"
+      },
+      {
+        "label": "tray",
+        "url": "/tray",
+        "title": "Halftime",
+        "visible": false,
+        "width": 360,
+        "height": 220,
+        "decorations": false,
+        "transparent": true,
+        "resizable": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visibleOnAllWorkspaces": true,
+        "shadow": true,
+        "focus": true,
+        "windowEffects": {
+          "effects": [
+            "popover",
+            "acrylic"
+          ],
+          "state": "active",
+          "radius": 16
+        }
       }
     ],
     "security": {
       "csp": null
-    }
+    },
+    "macOSPrivateApi": true
   },
   "bundle": {
     "active": true,

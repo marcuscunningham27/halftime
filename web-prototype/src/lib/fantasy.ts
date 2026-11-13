@@ -13,6 +13,7 @@ export type Credentials = { espnS2: string; swid: string };
 
 // Saved leagues in localStorage; ESPN's private-league cookies in the Keychain / Credential Manager (secrets.ts).
 import { getSecret, setSecret } from './secrets.ts';
+import { getJSON, inTauri } from './platform.ts';
 const read = <T>(key: string, fallback: T): T => {
 	try {
 		return JSON.parse(localStorage.getItem(key) ?? '') as T;
@@ -54,11 +55,6 @@ function erf(x: number): number {
 	return x >= 0 ? y : -y;
 }
 
-async function getJSON(url: string, init?: RequestInit): Promise<any> {
-	const response = await fetch(url, init);
-	if (!response.ok) throw Object.assign(new Error(`HTTP ${response.status}`), { status: response.status });
-	return response.json();
-}
 
 // MARK: Sleeper (public, read-only, open to browsers)
 
@@ -68,8 +64,8 @@ export type NFLState = { season: string; seasonStart: Date };
 
 export async function nflState(): Promise<NFLState> {
 	const s = await getJSON(`${sleeper}state/nfl`);
-	// Midnight Eastern on the season's start date.
-	return { season: s.season, seasonStart: new Date(`${s.season_start_date}T05:00:00Z`) };
+	// Midnight Eastern on the season's start date, which is always in September, so daylight time (UTC−4).
+	return { season: s.season, seasonStart: new Date(`${s.season_start_date}T04:00:00Z`) };
 }
 
 /** The NFL week a date falls in: weeks run seven days from the season's start. */
@@ -168,11 +164,10 @@ async function sleeperMatchup(leagueID: string, userID: string, week: number, pr
 
 export class PrivateLeagueError extends Error {
 	constructor() {
-		super(inTauri ? 'This league is private. Add your espn_s2 and SWID cookies to read it.' : 'This league is private. Private ESPN leagues only work in the desktop app.');
+		super(inTauri() ? 'This league is private. Add your espn_s2 and SWID cookies to read it.' : 'This league is private. Private ESPN leagues only work in the desktop app.');
 	}
 }
 
-const inTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 /** In the desktop app ESPN goes through Rust, which may send the Cookie header a browser page can't. */
 async function espnFetch(leagueID: string, season: string, views: string[], week?: number, given?: Credentials): Promise<any> {
@@ -180,7 +175,7 @@ async function espnFetch(leagueID: string, season: string, views: string[], week
 	const query = views.map((v) => `view=${v}`).concat(week ? [`scoringPeriodId=${week}`] : []).join('&');
 	const url = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${season}/segments/0/leagues/${leagueID}?${query}`;
 	const headers: Record<string, string> = credentials ? { Cookie: `espn_s2=${credentials.espnS2}; SWID=${credentials.swid}` } : {};
-	const send = inTauri ? (await import('@tauri-apps/plugin-http')).fetch : fetch;
+	const send = inTauri() ? (await import('@tauri-apps/plugin-http')).fetch : fetch;
 	const response = await send(url, { headers });
 	if (response.status === 401) throw new PrivateLeagueError();
 	if (response.status === 404) throw new Error('No ESPN league with that ID this season.');
@@ -220,7 +215,11 @@ function espnPlayer(p: any): Player {
 }
 
 async function espnTeam(leagueID: string, season: string, teamID: string, c?: Credentials): Promise<Team | undefined> {
-	const d = await espnFetch(leagueID, season, ['mRoster', 'mSettings'], undefined, c);
+	return parseEspnTeam(await espnFetch(leagueID, season, ['mRoster', 'mSettings'], undefined, c), teamID);
+}
+
+/** One team's lineup (ESPN's slots in display order, empty ones kept) and bench, from a league response. */
+export function parseEspnTeam(d: any, teamID: string): Team | undefined {
 	const team = d.teams?.find((t: any) => String(t.id) === teamID);
 	if (!team) return;
 	const entries: any[] = team.roster?.entries ?? [];
@@ -235,7 +234,11 @@ async function espnTeam(leagueID: string, season: string, teamID: string, c?: Cr
 
 /** Points per player for a week: actual (source 0) or ESPN's projection (source 1). */
 async function espnPoints(leagueID: string, season: string, week: number, source: 0 | 1, c?: Credentials): Promise<Record<string, number>> {
-	const d = await espnFetch(leagueID, season, ['mRoster'], week, c);
+	return parseEspnPoints(await espnFetch(leagueID, season, ['mRoster'], week, c), week, source);
+}
+
+/** Points per player for a week across the league's rosters: actual (source 0) or ESPN's projection (source 1). */
+export function parseEspnPoints(d: any, week: number, source: 0 | 1): Record<string, number> {
 	const points: Record<string, number> = {};
 	for (const entry of (d.teams ?? []).flatMap((t: any) => t.roster?.entries ?? [])) {
 		const p = entry.playerPoolEntry?.player;

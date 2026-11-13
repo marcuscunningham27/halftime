@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { openInBrowser } from './platform';
 	// WeekOverviewCard.swift: on request, a Claude briefing on the matchup, lineup gaps and injuries, then the news
 	// stories behind it, each opening on espn.com.
 	import type { Team, Player, Matchup, News } from './fantasy';
@@ -39,12 +40,6 @@
 		loading = false;
 	}
 
-	/** In the desktop app a link would replace the app's own page, so stories open in the default browser instead. */
-	async function open(e: MouseEvent, url: string) {
-		if (!('__TAURI_INTERNALS__' in window)) return;
-		e.preventDefault();
-		(await import('@tauri-apps/plugin-opener')).openUrl(url);
-	}
 </script>
 
 <section class="sports-card">
@@ -67,7 +62,7 @@
 		<hr />
 		<span class="label">Stories</span>
 		{#each stories as { p, n } (n.id + p.id)}
-			<a class="story" href={n.url} target="_blank" rel="noopener noreferrer" onclick={(e) => n.url && open(e, n.url)}>
+			<a class="story" href={n.url} target="_blank" rel="noopener noreferrer" onclick={(e) => openInBrowser(e, n.url)}>
 				<span class="meta"><b>{p.name}</b><span>{n.source}</span></span>
 				<span class="headline">{n.headline}</span>
 			</a>

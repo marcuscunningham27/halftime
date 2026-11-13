@@ -1,7 +1,12 @@
-# Tauri + SvelteKit + TypeScript
+# Halftime (web prototype)
 
-This template should help get you started developing with Tauri, SvelteKit and TypeScript in Vite.
+A Tauri + SvelteKit version of the Halftime sports app, kept at the same features as the Swift app in the
+repository root, to run on Mac, Windows and the web.
 
-## Recommended IDE Setup
+- Run the desktop app: `CARGO_TARGET_DIR="$HOME/Library/Caches/halftime-prototype-target" npm run tauri dev`
+  (the cache path keeps Rust's build output out of iCloud).
+- Run in a browser only: `npm run dev`, then open http://localhost:1420.
+- Checks: `npm run check` (types) and `npm test` (logic, with Node's test runner).
 
-[VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer).
+Data comes from ESPN's and Sleeper's public APIs; ESPN Fantasy private leagues and the Claude key use the
+system Keychain / Credential Manager through the Rust commands in `src-tauri/src/lib.rs`.

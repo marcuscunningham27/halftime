@@ -1,6 +1,7 @@
 <script lang="ts">
 	// SettingsView.swift: General, Notifications, Following, Fantasy and Summaries.
 	import { goto } from '$app/navigation';
+	import { inTauri as isTauri } from '$lib/platform';
 	import Backdrop from '$lib/Backdrop.svelte';
 	import GlassPicker from '$lib/GlassPicker.svelte';
 	import FollowButton from '$lib/FollowButton.svelte';
@@ -15,7 +16,7 @@
 
 	const tabs = ['General', 'Notifications', 'Following', 'Fantasy', 'Summaries'] as const;
 	let tab = $state<(typeof tabs)[number]>('General');
-	const inTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+	const inTauri = isTauri();
 
 	// Launch at login is the system's own setting, read and written through the autostart plugin.
 	let launchAtLogin = $state(false);
@@ -181,15 +182,6 @@
 </main>
 
 <style>
-	header {
-		position: sticky;
-		top: 0;
-		z-index: 2;
-		height: 52px;
-		display: flex;
-		align-items: center;
-		padding: 0 16px 0 var(--titlebar-inset);
-	}
 	h1 {
 		margin: 0;
 		font-size: 17px;

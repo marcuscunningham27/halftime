@@ -13,7 +13,6 @@ const held = new Map<string, { title: string; body: string }>();
 
 const includes = (g: Game) =>
 	isFollowingTeam(g.league.id, g.home.team.id) || isFollowingTeam(g.league.id, g.away.team.id) || follows.leagues.includes(g.league.id);
-const gameLink = (g: Game) => `/game?league=${g.league.id}&id=${g.id}&day=${new Date(g.startDate).setHours(0, 0, 0, 0)}`;
 
 /** Followed teams decide (any unmuted one); otherwise a followed league does. */
 function shouldNotify(e: GameEvent, g: Game): boolean {
@@ -85,55 +84,88 @@ async function fetchToday(): Promise<Game[]> {
 
 let tray: import('@tauri-apps/api/tray').TrayIcon | undefined;
 
+/** The Dock icon shows with the window and hides with it in Close to Menu (macOS; a no-op elsewhere). */
+const setDockVisible = async (visible: boolean) => (await import('@tauri-apps/api/core')).invoke('set_dock_visible', { visible });
+
 async function showWindow(path?: string) {
 	const { getCurrentWindow } = await import('@tauri-apps/api/window');
 	const win = getCurrentWindow();
+	await setDockVisible(true);
 	await win.show();
 	await win.unminimize();
 	await win.setFocus();
 	if (path) goto(path);
 }
 
-async function updateTray() {
-	const { Menu } = await import('@tauri-apps/api/menu');
-	const followed = games.filter(includes);
-	// The pinned game is the earliest live followed one; otherwise just the icon.
-	const pinned = followed.find((g) => g.status === 'live');
-	const shown = followed.filter((g) => g.status !== 'final');
+/** Today's live and upcoming followed games, to the menu-bar panel (its own window, see routes/tray). */
+async function sendToPanel() {
+	const { emitTo } = await import('@tauri-apps/api/event');
 	const nothing = follows.leagues.length === 0 && follows.teams.length === 0;
-	const items = [
-		{ text: 'Today', enabled: false },
-		...(nothing
-			? [{ text: 'Nothing followed yet', enabled: false }]
-			: shown.length === 0
-				? [{ text: 'No live or upcoming games', enabled: false }]
-				: shown.map((g) => ({
-						text: g.status === 'live' ? compactScore(g) : `${g.away.team.abbreviation} @ ${g.home.team.abbreviation} · ${g.startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`,
-						action: () => showWindow(gameLink(g))
-					}))),
-		{ item: 'Separator' as const },
-		{ text: 'Open Halftime', action: () => showWindow() },
-		{ text: 'Settings…', action: () => showWindow('/settings') },
-		{ item: 'Separator' as const },
-		{ text: 'Quit Halftime', action: async () => (await import('@tauri-apps/api/window')).getCurrentWindow().destroy() }
-	];
-	const menu = await Menu.new({ items });
+	await emitTo('tray', 'tray-games', { games: games.filter((g) => includes(g) && g.status !== 'final'), nothing });
+}
+
+/** When the panel last closed itself; the click on the icon that closed it shouldn't open it again. */
+let panelHiddenAt = 0;
+
+/** Opens the panel centred under the icon (above it on Windows, whose tray is at the bottom), kept on screen. */
+async function togglePanel(icon: { position: { x: number; y: number }; size: { width: number; height: number } }) {
+	if (Date.now() - panelHiddenAt < 300) return;
+	const { Window, PhysicalPosition, monitorFromPoint } = await import('@tauri-apps/api/window');
+	const panel = await Window.getByLabel('tray');
+	if (!panel) return;
+	if (await panel.isVisible()) return panel.hide();
+	const [size, scale, monitor] = await Promise.all([panel.outerSize(), panel.scaleFactor(), monitorFromPoint(icon.position.x, icon.position.y)]);
+	const gap = 6 * scale;
+	const area = monitor?.workArea;
+	const atTop = !area || icon.position.y < area.position.y + area.size.height / 2;
+	let x = icon.position.x + icon.size.width / 2 - size.width / 2;
+	if (area) x = Math.min(Math.max(x, area.position.x + gap), area.position.x + area.size.width - size.width - gap);
+	const y = atTop ? icon.position.y + icon.size.height + gap : icon.position.y - size.height - gap;
+	await panel.setPosition(new PhysicalPosition(Math.round(x), Math.round(y)));
+	await panel.show();
+	await panel.setFocus();
+}
+
+async function updateTray() {
+	const pinned = games.find((g) => includes(g) && g.status === 'live');
 	if (!tray) {
 		const { TrayIcon } = await import('@tauri-apps/api/tray');
 		// A dev reload re-runs this module; reuse the tray it made rather than adding a second.
 		tray = (await TrayIcon.getById('halftime')) ?? undefined;
+		if (tray) await tray.setShowMenuOnLeftClick(false);
 	}
 	if (!tray) {
 		const { TrayIcon } = await import('@tauri-apps/api/tray');
+		const { Menu } = await import('@tauri-apps/api/menu');
 		const { defaultWindowIcon } = await import('@tauri-apps/api/app');
-		// shortcut: uses the app icon; a monochrome template image (like the Swift sports-court symbol) would sit better in the menu bar.
-		tray = await TrayIcon.new({ id: 'halftime', icon: (await defaultWindowIcon()) ?? undefined, menu, showMenuOnLeftClick: true, tooltip: 'Halftime' });
-	} else {
-		await tray.setMenu(menu);
+		// Left click opens the panel; right click keeps a short menu, the only place to quit while the window is closed.
+		const menu = await Menu.new({
+			items: [
+				{ text: 'Open Halftime', action: () => showWindow() },
+				{ text: 'Settings…', action: () => showWindow('/settings') },
+				{ item: 'Separator' },
+				{ text: 'Quit Halftime', action: async () => (await import('@tauri-apps/api/window')).getCurrentWindow().destroy() }
+			]
+		});
+		// The Mac menu bar gets a black pitch outline that macOS tints to match it (a template image); Windows' tray keeps the app icon.
+		const mac = navigator.userAgent.includes('Mac');
+		const icon = mac ? new Uint8Array(await (await fetch('/tray-template.png')).arrayBuffer()) : ((await defaultWindowIcon()) ?? undefined);
+		tray = await TrayIcon.new({
+			id: 'halftime',
+			icon,
+			iconAsTemplate: mac,
+			menu,
+			showMenuOnLeftClick: false,
+			tooltip: 'Halftime',
+			action: (e) => {
+				if (e.type === 'Click' && e.button === 'Left' && e.buttonState === 'Up') togglePanel(e.rect).catch((err) => console.error('Menu-bar panel failed:', err));
+			}
+		});
 	}
 	// macOS shows the title beside the icon; Windows has no tray text, so the score goes in the hover tooltip there.
 	await tray.setTitle(pinned ? compactScore(pinned) : null);
 	await tray.setTooltip(pinned ? compactScore(pinned) : 'Halftime');
+	await sendToPanel();
 }
 
 /** Starts polling, the tray and Close to Menu; call once, in the desktop app. */
@@ -147,7 +179,12 @@ export async function startLive() {
 		if (!settings.closeToMenu) return;
 		e.preventDefault();
 		getCurrentWindow().hide();
+		setDockVisible(false);
 	});
+	const { listen } = await import('@tauri-apps/api/event');
+	listen('tray-ready', () => sendToPanel());
+	listen<string | null>('tray-open', ({ payload }) => showWindow(payload ?? undefined));
+	listen('tray-hidden', () => (panelHiddenAt = Date.now()));
 	// Covers follows made before alerts existed; the system only asks once.
 	if (follows.leagues.length || follows.teams.length) {
 		import('@tauri-apps/plugin-notification').then(async (n) => {

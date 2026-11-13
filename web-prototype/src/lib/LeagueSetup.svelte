@@ -64,7 +64,7 @@
 	}
 </script>
 
-<section class="card">
+<section class="sports-card setup">
 	<div class="top">
 		<h2>Manage Leagues</h2>
 		{#if leagues.length}<button class="text" onclick={onclose}>Done</button>{/if}
@@ -107,11 +107,8 @@
 </section>
 
 <style>
-	.card {
-		padding: 12px 16px 16px;
-		border-radius: 22px;
-		background: rgba(0, 0, 0, 0.38);
-		box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+	.setup {
+		padding-bottom: 16px;
 		display: flex;
 		flex-direction: column;
 		gap: 12px;

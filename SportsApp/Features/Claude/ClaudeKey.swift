@@ -30,14 +30,18 @@ final class ClaudeKey {
     @discardableResult
     func set(_ key: String) -> Bool {
         let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        SecItemDelete(Self.query as CFDictionary)
         guard !key.isEmpty else {
+            SecItemDelete(Self.query as CFDictionary)
             value = nil
             return true
         }
-        var item = Self.query
-        item[kSecValueData as String] = Data(key.utf8)
-        guard SecItemAdd(item as CFDictionary, nil) == errSecSuccess else { return false }
+        // Update in place, adding only when there's nothing saved yet, so a refused write never loses the old key.
+        let data = [kSecValueData as String: Data(key.utf8)]
+        var status = SecItemUpdate(Self.query as CFDictionary, data as CFDictionary)
+        if status == errSecItemNotFound {
+            status = SecItemAdd(Self.query.merging(data) { $1 } as CFDictionary, nil)
+        }
+        guard status == errSecSuccess else { return false }
         value = key
         return true
     }

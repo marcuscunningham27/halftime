@@ -1,4 +1,5 @@
 // Ported from SportsKit's ESPN provider: the same unofficial endpoints.
+import { getJSON } from './platform.ts';
 
 export type Sport = 'football' | 'basketball' | 'hockey' | 'baseball' | 'soccer';
 export type League = {
@@ -75,11 +76,7 @@ export type Game = {
 
 const base = 'https://site.api.espn.com/apis/site/v2/sports/';
 
-async function get(url: string): Promise<any> {
-	const response = await fetch(url);
-	if (!response.ok) throw new Error(`ESPN returned ${response.status}`);
-	return response.json();
-}
+const get = getJSON;
 
 /** ESPN files games by US Eastern day; a local day can straddle two of them. */
 function espnDays(day: Date): string[] {

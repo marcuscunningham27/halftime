@@ -89,10 +89,16 @@ final class FantasyStore {
     /// Saves (or with nil, deletes) a private league's cookies. Returns false if the Keychain refused.
     @discardableResult
     func setCredentials(_ credentials: ESPNFantasy.Credentials?, leagueID: String) -> Bool {
-        SecItemDelete(Self.query(leagueID) as CFDictionary)
-        guard let credentials, let data = try? JSONEncoder().encode(credentials) else { return true }
-        var item = Self.query(leagueID)
-        item[kSecValueData as String] = data
-        return SecItemAdd(item as CFDictionary, nil) == errSecSuccess
+        guard let credentials, let data = try? JSONEncoder().encode(credentials) else {
+            SecItemDelete(Self.query(leagueID) as CFDictionary)
+            return true
+        }
+        // Update in place, adding only when there's nothing saved yet, so a refused write never loses the old cookies.
+        let value = [kSecValueData as String: data]
+        var status = SecItemUpdate(Self.query(leagueID) as CFDictionary, value as CFDictionary)
+        if status == errSecItemNotFound {
+            status = SecItemAdd(Self.query(leagueID).merging(value) { $1 } as CFDictionary, nil)
+        }
+        return status == errSecSuccess
     }
 }

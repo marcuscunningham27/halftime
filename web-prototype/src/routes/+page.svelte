@@ -21,8 +21,16 @@
 	async function refresh(forOffset = offset) {
 		try {
 			// The fixed list: fetching doesn't care about order, and reading the ordered one would refetch on every reorder.
-			const result = (await Promise.all(allLeagues.map((l) => scoreboard(l, startOfDay(forOffset)).catch(() => [])))).flat();
-			if (forOffset === offset) [games, error] = [result, undefined];
+			const results = await Promise.all(allLeagues.map((l) => scoreboard(l, startOfDay(forOffset)).catch(() => undefined)));
+			if (forOffset !== offset) return;
+			// One league failing (an endpoint change, say) shouldn't blank the others; only every league failing is an
+			// error, as in ScoreboardPoller. Games already shown stay up meanwhile.
+			if (results.every((r) => r === undefined)) {
+				error = 'Couldn’t load scores. Check your connection.';
+				games ??= [];
+				return;
+			}
+			[games, error] = [results.flatMap((r) => r ?? []), undefined];
 		} catch (e) {
 			error = String(e);
 		}
@@ -53,13 +61,13 @@
 
 <main>
 	<div class="picker"><GlassPicker options={[...days]} bind:selected={day} /></div>
-	<section class="card">
+	<section class="sports-card">
 		{#if games === undefined}
 			<div class="empty"><span class="spinner" aria-label="Loading"></span></div>
 		{:else if games.length === 0}
 			<div class="empty">
 				<svg viewBox="0 0 24 24" width="36" height="36" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="1.6" /><path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
-				<strong>No Games {day}</strong>
+				<strong>{error ? 'Couldn’t Load Scores' : `No Games ${day}`}</strong>
 				{#if error}<span>{error}</span>{/if}
 			</div>
 		{:else}
@@ -87,14 +95,7 @@
 
 <style>
 	header {
-		position: sticky;
-		top: 0;
-		z-index: 2;
-		height: 52px;
-		display: flex;
-		align-items: center;
 		justify-content: space-between;
-		padding: 0 16px 0 var(--titlebar-inset);
 	}
 	.brand {
 		display: flex;
@@ -125,13 +126,6 @@
 	.mark .line { width: 1.8px; height: 100%; }
 	.mark .ring { width: 14px; height: 14px; border-radius: 50%; background: none; border: 1.8px solid currentColor; box-sizing: border-box; }
 	.mark .spot { width: 3.2px; height: 3.2px; border-radius: 50%; }
-	.round {
-		width: 32px;
-		height: 32px;
-		border-radius: 50%;
-		display: grid;
-		place-items: center;
-	}
 	main {
 		max-width: 760px;
 		margin: 0 auto;
@@ -144,12 +138,6 @@
 		margin-bottom: 14px;
 	}
 	/* SportsCard: darkened, not grey, so the backdrop's colour shows through. */
-	.card {
-		padding: 12px 16px;
-		border-radius: 22px;
-		background: rgba(0, 0, 0, 0.38);
-		box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
-	}
 	h2 {
 		display: flex;
 		align-items: center;
