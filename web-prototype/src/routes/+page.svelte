@@ -3,7 +3,7 @@
 	import Backdrop from '$lib/Backdrop.svelte';
 	import GlassPicker from '$lib/GlassPicker.svelte';
 	import ScoreCard from '$lib/ScoreCard.svelte';
-	import { leagues as allLeagues, leagueLogo, scoreboard, startOfDay, ordered, orderLeagues, type Game } from '$lib/espn';
+	import { leagues as allLeagues, gameLink, leagueLogo, scoreboard, startOfDay, ordered, orderLeagues, type Game } from '$lib/espn';
 	import { isFollowingTeam } from '$lib/follows.svelte';
 	import { settings } from '$lib/settings.svelte';
 
@@ -75,7 +75,7 @@
 				<h2><svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M10 2.5l2.2 4.6 5 .6-3.7 3.5 1 5L10 13.8 5.5 16.2l1-5L2.8 7.7l5-.6z" fill="currentColor" /></svg>My Teams</h2>
 				{#each mine as game, j (game.id)}
 					{#if j > 0}<hr />{/if}
-					<a href="/game?league={game.league.id}&id={game.id}&day={startOfDay(offset).getTime()}" class="row"><ScoreCard {game} /></a>
+					<a href={gameLink(game)} class="row"><ScoreCard {game} /></a>
 				{/each}
 			{/if}
 			{#each leagues as league, i}
@@ -85,7 +85,7 @@
 					<h2><a href="/league?league={league.id}"><img src={leagueLogo(league)} alt="" width="20" height="20" />{league.abbreviation}<svg class="chevron" viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" /></svg></a></h2>
 					{#each leagueGames as game, j (game.id)}
 						{#if j > 0}<hr />{/if}
-						<a href="/game?league={league.id}&id={game.id}&day={startOfDay(offset).getTime()}" class="row"><ScoreCard {game} /></a>
+						<a href={gameLink(game)} class="row"><ScoreCard {game} /></a>
 					{/each}
 				{/if}
 			{/each}

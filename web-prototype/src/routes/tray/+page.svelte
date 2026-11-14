@@ -4,7 +4,7 @@
 	// sends it the games, so it fetches nothing itself.
 	import { emitTo, listen } from '@tauri-apps/api/event';
 	import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
-	import { headlineStatus, isLosing, type Game, type Competitor } from '$lib/espn';
+	import { gameLink, headlineStatus, isLosing, type Game, type Competitor } from '$lib/espn';
 
 	let games = $state<Game[]>([]);
 	let nothing = $state(false);
@@ -38,7 +38,6 @@
 		await getCurrentWindow().hide();
 		emitTo('main', 'tray-open', path ?? null);
 	};
-	const gameLink = (g: Game) => `/game?league=${g.league.id}&id=${g.id}&day=${new Date(g.startDate).setHours(0, 0, 0, 0)}`;
 </script>
 
 <svelte:head><title>Halftime</title></svelte:head>

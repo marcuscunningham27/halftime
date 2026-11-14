@@ -4,12 +4,28 @@ import { goto } from '$app/navigation';
 import { leagues, scoreboard, startOfDay, type Game } from './espn';
 import { follows, isFollowingTeam, teamKey } from './follows.svelte';
 import { settings } from './settings.svelte';
-import { EventDetector, applies, compactScore, isQuiet, type GameEvent } from './alerts';
+import { EventDetector, applies, compactScore, isQuiet, withLastKnown, type GameEvent } from './alerts';
 
 let games: Game[] = [];
 const detector = new EventDetector();
-/** Alerts held through quiet hours: the latest per game, so the morning brings current state rather than a pile. */
-const held = new Map<string, { title: string; body: string }>();
+/** Alerts held through quiet hours: the latest per game, so the morning brings current state rather than a pile.
+ *  Saved, as they're already logged as sent: a quit or restart before morning would otherwise lose them. */
+const heldKey = 'heldAlerts';
+const held = new Map<string, { title: string; body: string }>(readHeld());
+function readHeld(): [string, { title: string; body: string }][] {
+	try {
+		return JSON.parse(localStorage.getItem(heldKey) ?? '[]');
+	} catch {
+		return [];
+	}
+}
+function saveHeld() {
+	try {
+		localStorage.setItem(heldKey, JSON.stringify([...held]));
+	} catch {
+		// Storage unavailable: they last until the app closes.
+	}
+}
 
 const includes = (g: Game) =>
 	isFollowingTeam(g.league.id, g.home.team.id) || isFollowingTeam(g.league.id, g.away.team.id) || follows.leagues.includes(g.league.id);
@@ -55,22 +71,26 @@ function process(old: Game[], fresh: Game[]) {
 		for (const e of detector.events(previous.get(g.id), g)) {
 			if (!shouldNotify(e, g) || !markSent(`${g.id}-${e.key}`)) continue;
 			const title = `${g.away.team.shortName} at ${g.home.team.shortName} · ${e.headline}`;
-			if (quiet) held.set(g.id, { title, body: e.body });
-			else notify(title, e.body);
+			if (quiet) {
+				held.set(g.id, { title, body: e.body });
+				saveHeld();
+			} else notify(title, e.body);
 		}
 	}
-	if (!quiet) {
+	if (!quiet && held.size) {
 		for (const { title, body } of held.values()) notify(title, body);
 		held.clear();
+		saveHeld();
 	}
 }
 
 async function fetchToday(): Promise<Game[]> {
 	const ids = new Set([...follows.leagues, ...follows.teams.map((t) => t.leagueID)]);
 	const today = startOfDay(0);
-	const results = await Promise.allSettled(leagues.filter((l) => ids.has(l.id)).map((l) => scoreboard(l, today)));
+	const polled = leagues.filter((l) => ids.has(l.id));
+	const results = await Promise.allSettled(polled.map((l) => scoreboard(l, today)));
 	if (results.length && results.every((r) => r.status === 'rejected')) throw new Error('No scores');
-	const fresh = results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
+	const fresh = withLastKnown(polled.map((l) => l.id), results, games);
 	// A game still live from before midnight stays until a poll sees it end, so its final alert still fires.
 	for (const g of games.filter((g) => g.status === 'live' && g.startDate < today && !fresh.some((f) => f.id === g.id))) {
 		const day = new Date(g.startDate);

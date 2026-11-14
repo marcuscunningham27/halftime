@@ -76,13 +76,18 @@ export type Game = {
 
 const base = 'https://site.api.espn.com/apis/site/v2/sports/';
 
-const get = getJSON;
-
 /** ESPN files games by US Eastern day; a local day can straddle two of them. */
 function espnDays(day: Date): string[] {
 	const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
-	const end = new Date(day.getTime() + 86_400_000 - 1);
-	return [...new Set([day, end].map((d) => fmt.format(d).replaceAll('-', '')))];
+	const last = new Date(nextDay(day).getTime() - 1);
+	return [...new Set([day, last].map((d) => fmt.format(d).replaceAll('-', '')))];
+}
+
+/** Midnight after `day`: by the calendar, as clock-change days run 23 or 25 hours. */
+function nextDay(day: Date): Date {
+	const d = new Date(day);
+	d.setDate(d.getDate() + 1);
+	return d;
 }
 
 export function startOfDay(offset: number): Date {
@@ -93,8 +98,8 @@ export function startOfDay(offset: number): Date {
 }
 
 export async function scoreboard(league: League, day: Date): Promise<Game[]> {
-	const pages = await Promise.all(espnDays(day).map((d) => get(`${base}${league.path}/scoreboard?dates=${d}`)));
-	const end = day.getTime() + 86_400_000;
+	const pages = await Promise.all(espnDays(day).map((d) => getJSON(`${base}${league.path}/scoreboard?dates=${d}`)));
+	const end = nextDay(day).getTime();
 	const games = pages.flatMap((p) => (p.events ?? []).map((e: any) => parseEvent(e, league)));
 	const seen = new Set<string>();
 	return games.filter((g) => g.startDate.getTime() >= day.getTime() && g.startDate.getTime() < end && !seen.has(g.id) && seen.add(g.id));
@@ -102,7 +107,7 @@ export async function scoreboard(league: League, day: Date): Promise<Game[]> {
 
 /** One NFL regular-season week (seasontype 2), every game in a single request. */
 export async function nflWeek(season: string, week: number): Promise<Game[]> {
-	const page = await get(`${base}football/nfl/scoreboard?dates=${season}&seasontype=2&week=${week}&limit=100`);
+	const page = await getJSON(`${base}football/nfl/scoreboard?dates=${season}&seasontype=2&week=${week}&limit=100`);
 	return (page.events ?? []).map((e: any) => parseEvent(e, leagues[0]));
 }
 
@@ -261,7 +266,7 @@ export type GameDetail = { court?: Court; plays: Play[]; shots: Shot[]; drives: 
 
 export async function summary(game: Game): Promise<GameDetail> {
 	const [s, court] = await Promise.all([
-		get(`${base}${game.league.path}/summary?event=${game.id}`),
+		getJSON(`${base}${game.league.path}/summary?event=${game.id}`),
 		// An optional extra while live: the surface still draws without timeouts and fouls.
 		game.status === 'live' && game.league.sport !== 'baseball' && game.league.sport !== 'soccer' ? courtSituation(game).catch(() => undefined) : undefined
 	]);
@@ -347,7 +352,7 @@ function parsePlay(p: any, league: League, teamID?: string): Play {
  *  basketball nests them in an object whose remaining count is timeoutsRemainingCurrent. */
 async function courtSituation(game: Game): Promise<Court> {
 	const [sport, league] = game.league.path.split('/');
-	const d = await get(`https://sports.core.api.espn.com/v2/sports/${sport}/leagues/${league}/events/${game.id}/competitions/${game.id}/situation`);
+	const d = await getJSON(`https://sports.core.api.espn.com/v2/sports/${sport}/leagues/${league}/events/${game.id}/competitions/${game.id}/situation`);
 	const side = (timeouts: any, fouls: any): CourtSide => ({
 		timeoutsLeft: typeof timeouts === 'number' ? timeouts : timeouts?.timeoutsRemainingCurrent,
 		fouls: fouls?.teamFoulsCurrent,
@@ -621,6 +626,9 @@ export function possession(plays: Play[], awayID: string, homeID: string): strin
 	}
 }
 
+/** A game's page, opened on the local day it starts. */
+export const gameLink = (g: Game) => `/game?league=${g.league.id}&id=${g.id}&day=${new Date(g.startDate).setHours(0, 0, 0, 0)}`;
+
 export const leagueByID = (id: string | null) => leagues.find((l) => l.id === id) ?? leagues[0];
 
 export const hex = (h?: string) => (h && h.length === 6 ? `#${h}` : '#666');
@@ -677,7 +685,7 @@ function soccerTable() {
 
 /** College football shows the AP poll (else ESPN's first poll) as a one-table standings: record and poll points. */
 async function rankings(league: League): Promise<Standings> {
-	const polls: any[] = (await get(`${base}${league.path}/rankings`)).rankings ?? [];
+	const polls: any[] = (await getJSON(`${base}${league.path}/rankings`)).rankings ?? [];
 	const poll = polls.find((p) => p.type === 'ap') ?? polls[0];
 	if (!poll) return { columns: [], groups: [] };
 	return {
@@ -697,7 +705,7 @@ export async function standings(league: League): Promise<Standings> {
 	if (league.id === 'cfb') return rankings(league);
 	const spec = standingsSpecs[league.id];
 	// Standings live under /apis/v2, not the site API. Level 3 splits conferences into divisions.
-	const root = await get(`https://site.api.espn.com/apis/v2/sports/${league.path}/standings${spec.level ? `?level=${spec.level}` : ''}`);
+	const root = await getJSON(`https://site.api.espn.com/apis/v2/sports/${league.path}/standings${spec.level ? `?level=${spec.level}` : ''}`);
 	const stat = (e: any, name: string) => e.stats?.find((s: any) => s.name === name);
 	// Groups are whichever nodes carry entries: conferences, divisions, or the whole league.
 	const groups = (node: any): Standings['groups'] => {
@@ -717,7 +725,7 @@ export async function standings(league: League): Promise<Standings> {
 
 /** The league's most recent finals, newest first: the current slate, else stepping back a day at a time, up to a week. */
 export async function recentResults(league: League, before: Date): Promise<Game[]> {
-	let finals = (await get(`${base}${league.path}/scoreboard`)).events?.map((e: any) => parseEvent(e, league)).filter((g: Game) => g.status === 'final') ?? [];
+	let finals = (await getJSON(`${base}${league.path}/scoreboard`)).events?.map((e: any) => parseEvent(e, league)).filter((g: Game) => g.status === 'final') ?? [];
 	for (let back = 1; back <= 7 && finals.length === 0; back++) {
 		const day = new Date(before);
 		day.setHours(0, 0, 0, 0);
@@ -751,7 +759,7 @@ export type ChartPoint = ProbabilityPoint & { progress: number; homeScore: numbe
 
 export async function probabilities(game: Game): Promise<ProbabilityPoint[]> {
 	const [sport, league] = game.league.path.split('/');
-	const d = await get(`https://sports.core.api.espn.com/v2/sports/${sport}/leagues/${league}/events/${game.id}/competitions/${game.id}/probabilities?limit=1000`);
+	const d = await getJSON(`https://sports.core.api.espn.com/v2/sports/${sport}/leagues/${league}/events/${game.id}/competitions/${game.id}/probabilities?limit=1000`);
 	return (d.items ?? []).flatMap((item: any) => {
 		// ".../plays/4018730081?lang=en" → "4018730081"
 		const id = item.play?.$ref?.split('/plays/').at(-1)?.split('?')[0];

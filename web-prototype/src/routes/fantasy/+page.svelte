@@ -47,7 +47,8 @@
 				F.byes(new Map(all.map((games, i) => [i + 1, games.map((g) => ({ home: g.home.team.abbreviation, away: g.away.team.abbreviation }))])))
 			));
 		}
-		return byeCache.get(season)!.catch(() => ({}));
+		// A failed week isn't kept, so the next load asks again.
+		return byeCache.get(season)!.catch(() => (byeCache.delete(season), {}));
 	}
 
 	async function load(league: F.LeagueRef) {

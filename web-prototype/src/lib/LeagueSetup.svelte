@@ -31,6 +31,8 @@
 				found = list.map((l) => ({ label: l.name, ref: { provider: 'sleeper', leagueID: l.id, name: l.name, memberID: userID } }));
 			} else {
 				const id = leagueID.trim();
+				// As FantasySettings.swift: the ID is a number, and pasting the league's address would look up nothing.
+				if (!/^\d+$/.test(id)) throw new Error('The league ID is the number after leagueId= in the league’s web address.');
 				const credentials = espnS2.trim() && swid.trim() ? { espnS2: espnS2.trim(), swid: swid.trim() } : undefined;
 				const league = await espnLeague(id, season, credentials);
 				pendingCookies = { leagueID: id, credentials };

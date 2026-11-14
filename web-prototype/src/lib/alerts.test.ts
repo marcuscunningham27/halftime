@@ -2,7 +2,7 @@
 // Cases from SportsKit's NotificationTests, so both apps alert alike.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { EventDetector, isQuiet, compactScore } from './alerts.ts';
+import { EventDetector, isQuiet, compactScore, withLastKnown } from './alerts.ts';
 
 const league = { id: 'nfl', name: 'NFL', abbreviation: 'NFL', path: '', sport: 'football', regulationPeriods: 4, periodStyle: 'quarters' };
 const team = (id) => ({ id, abbreviation: id, displayName: id, shortName: id });
@@ -42,4 +42,11 @@ test('menu bar score is compact', () => {
 	assert.equal(compactScore(game()), 'WSH 3 – 7 SF · Q2');
 	assert.equal(compactScore(game({ statusName: 'STATUS_HALFTIME' })), 'WSH 3 – 7 SF · Half');
 	assert.equal(compactScore(game({ period: 5 })), 'WSH 3 – 7 SF · OT');
+});
+
+test('a league whose fetch failed keeps its last games, so the next poll still sees the score change', () => {
+	const nba = { ...league, id: 'nba' };
+	const last = [game(), game({ id: '2', league: nba })];
+	const fresh = withLastKnown(['nfl', 'nba'], [{ status: 'fulfilled', value: [game({ away: { team: team('WSH'), score: 10, periodScores: [] } })] }, { status: 'rejected', reason: new Error() }], last);
+	assert.deepEqual(fresh.map((g) => [g.id, g.away.score]), [['1', 10], ['2', 3]]);
 });

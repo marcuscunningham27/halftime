@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	import type { Game } from './espn';
+	import { gameLink, type Game } from './espn';
 	import type { Player } from './fantasy';
 	/** One NFL game and your players in it: stat lines and points once it has started. */
 	export type Line = { player: Player; isStarter: boolean; points?: number; stats: string[] };
@@ -19,7 +19,7 @@
 {/if}
 {#each entries as entry (entry.game.id)}
 	<section class="sports-card">
-		<a class="game" href="/game?league=nfl&id={entry.game.id}&day={new Date(entry.game.startDate).setHours(0, 0, 0, 0)}">
+		<a class="game" href={gameLink(entry.game)}>
 			<ScoreCard game={entry.game} showsDate />
 		</a>
 		<hr />

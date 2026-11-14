@@ -7,7 +7,7 @@
 	import ScoreCard from '$lib/ScoreCard.svelte';
 	import FollowButton from '$lib/FollowButton.svelte';
 	import { isFollowingTeam } from '$lib/follows.svelte';
-	import { leagueByID, leagueLogo, scoreboard, recentResults, upcoming, standings as loadStandings, startOfDay, type Game, type Standings } from '$lib/espn';
+	import { gameLink, leagueByID, leagueLogo, scoreboard, recentResults, upcoming, standings as loadStandings, startOfDay, type Game, type Standings } from '$lib/espn';
 
 	const league = $derived(leagueByID(page.url.searchParams.get('league')));
 	const teamID = $derived(page.url.searchParams.get('team'));
@@ -101,7 +101,6 @@
 		return [...groups];
 	}
 	const subtitle = $derived(showsUpcoming ? 'Coming up' : startOfDay(offset).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }));
-	const gameLink = (g: Game) => `/game?league=${league.id}&id=${g.id}&day=${dayKey(g.startDate)}`;
 	const teamLink = (id: string) => `/league?league=${league.id}&team=${id}`;
 </script>
 

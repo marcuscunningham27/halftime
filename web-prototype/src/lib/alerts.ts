@@ -111,6 +111,11 @@ function periodName(g: Game): string {
 	return `${l.periodStyle === 'quarters' ? 'Quarter' : 'Period'} ${g.period}`;
 }
 
+/** Each league's fresh games, or its last ones where its fetch failed, so the next good poll still sees what changed. */
+export function withLastKnown(ids: string[], results: PromiseSettledResult<Game[]>[], last: Game[]): Game[] {
+	return results.flatMap((r, i) => (r.status === 'fulfilled' ? r.value : last.filter((g) => g.league.id === ids[i])));
+}
+
 /** Quiet hours hold alerts until they end. Times are minutes after midnight; a window may cross midnight. */
 export function isQuiet(now: Date, enabled: boolean, start: number, end: number): boolean {
 	if (!enabled || start === end) return false;

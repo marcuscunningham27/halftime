@@ -65,23 +65,24 @@ public final class ScoreboardPoller {
             // so it doesn't vanish mid-game and its final alert still fires.
             let carried = date == nil
                 ? games.filter { $0.status == .live && $0.startDate < Calendar.current.startOfDay(for: day) } : []
-            let results = await withTaskGroup(of: Result<[Game], Error>.self) { group in
+            let results = await withTaskGroup(of: (String, Result<[Game], Error>).self) { group in
                 for league in leagues {
                     group.addTask {
-                        do { return .success(try await provider.scoreboard(league: league, date: day)) }
-                        catch { return .failure(error) }
+                        do { return (league.id, .success(try await provider.scoreboard(league: league, date: day))) }
+                        catch { return (league.id, .failure(error)) }
                     }
                 }
-                var results: [Result<[Game], Error>] = []
+                var results: [(String, Result<[Game], Error>)] = []
                 for await result in group { results.append(result) }
                 return results
             }
             // One league failing (an endpoint change, say) shouldn't blank the others; only all failing is an error.
-            let failures = results.compactMap { result -> Error? in
+            let failures = results.compactMap { _, result -> Error? in
                 if case .failure(let error) = result { error } else { nil }
             }
             if !results.isEmpty, failures.count == results.count { throw failures[0] }
-            var games = results.flatMap { (try? $0.get()) ?? [] }
+            // A league that failed keeps its last games, so when it's back the change is still seen and alerted.
+            var games = results.flatMap { id, result in (try? result.get()) ?? self.games.filter { $0.leagueID == id } }
             for game in carried where !games.contains(where: { $0.id == game.id }) {
                 guard let league = leagues.first(where: { $0.id == game.leagueID }) else { continue }
                 // On a failed fetch keep the last copy, so the next poll tries again instead of dropping it.
