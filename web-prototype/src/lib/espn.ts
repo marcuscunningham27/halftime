@@ -10,6 +10,8 @@ export type League = {
 	sport: Sport;
 	regulationPeriods: number;
 	periodStyle: 'quarters' | 'periods' | 'halves' | 'innings';
+	/** Extra scoreboard parameters: college basketball needs all of Division I asked for, or ESPN sends only featured games. */
+	query?: string;
 };
 
 /** Every league, in sidebar order (League.all). */
@@ -19,6 +21,7 @@ export const leagues: League[] = [
 	{ id: 'cfb', name: 'College Football', abbreviation: 'NCAAF', path: 'football/college-football', sport: 'football', regulationPeriods: 4, periodStyle: 'quarters' },
 	{ id: 'nba', name: 'National Basketball Association', abbreviation: 'NBA', path: 'basketball/nba', sport: 'basketball', regulationPeriods: 4, periodStyle: 'quarters' },
 	{ id: 'wnba', name: "Women's National Basketball Association", abbreviation: 'WNBA', path: 'basketball/wnba', sport: 'basketball', regulationPeriods: 4, periodStyle: 'quarters' },
+	{ id: 'ncaab', name: "Men's College Basketball", abbreviation: 'NCAAB', path: 'basketball/mens-college-basketball', sport: 'basketball', regulationPeriods: 2, periodStyle: 'halves', query: '&groups=50&limit=400' },
 	{ id: 'mlb', name: 'Major League Baseball', abbreviation: 'MLB', path: 'baseball/mlb', sport: 'baseball', regulationPeriods: 9, periodStyle: 'innings' },
 	{ id: 'nhl', name: 'National Hockey League', abbreviation: 'NHL', path: 'hockey/nhl', sport: 'hockey', regulationPeriods: 3, periodStyle: 'periods' },
 	{ id: 'epl', name: 'Premier League', abbreviation: 'EPL', path: 'soccer/eng.1', sport: 'soccer', regulationPeriods: 2, periodStyle: 'halves' },
@@ -44,14 +47,15 @@ export function moveLeague(ids: string[], id: string, before: string | undefined
 }
 
 const soccerLogoIDs: Record<string, number> = { epl: 23, ucl: 2, mls: 19 };
-/** Soccer league logos live under ESPN's numeric league IDs; college football has its own icon (League.logoURL). */
+/** Soccer league logos live under ESPN's numeric league IDs; college sports have their own icons (League.logoURL). */
 export const leagueLogo = (l: League) =>
 	l.id === 'cfb' ? 'https://a.espncdn.com/redesign/assets/img/icons/NCAASports_Football.png'
+	: l.id === 'ncaab' ? 'https://a.espncdn.com/redesign/assets/img/icons/NCAASports_MensBasketball.png'
 	: soccerLogoIDs[l.id] ? `https://a.espncdn.com/i/leaguelogos/soccer/500/${soccerLogoIDs[l.id]}.png`
 	: `https://a.espncdn.com/i/teamlogos/leagues/500/${l.id}.png`;
 
 export type Team = { id: string; abbreviation: string; displayName: string; shortName: string; color?: string; alternateColor?: string; logo?: string };
-/** rank: the AP Top 25 place, college football's ranked teams only. */
+/** rank: the AP Top 25 place, ranked college teams only. */
 export type Competitor = { team: Team; score?: number; record?: string; periodScores: number[]; rank?: number };
 /** "#5 Georgia" for a ranked team, else the short name (Competitor.rankedName). */
 export const rankedName = (c: Competitor) => (c.rank ? `#${c.rank} ${c.team.shortName}` : c.team.shortName);
@@ -98,7 +102,7 @@ export function startOfDay(offset: number): Date {
 }
 
 export async function scoreboard(league: League, day: Date): Promise<Game[]> {
-	const pages = await Promise.all(espnDays(day).map((d) => getJSON(`${base}${league.path}/scoreboard?dates=${d}`)));
+	const pages = await Promise.all(espnDays(day).map((d) => getJSON(`${base}${league.path}/scoreboard?dates=${d}${league.query ?? ''}`)));
 	const end = nextDay(day).getTime();
 	const games = pages.flatMap((p) => (p.events ?? []).map((e: any) => parseEvent(e, league)));
 	const seen = new Set<string>();
@@ -195,7 +199,7 @@ export function headlineStatus(g: Game): string {
 
 export function periodLabel(l: League, n: number): string {
 	if (n <= l.regulationPeriods || l.periodStyle === 'innings') return String(n);
-	if (l.periodStyle === 'halves') return 'ET';
+	if (l.sport === 'soccer') return 'ET';
 	const ot = n - l.regulationPeriods;
 	return ot === 1 ? 'OT' : `${ot}OT`;
 }
@@ -595,7 +599,8 @@ export function bannerTitle(p: Play, g: Game): string {
 
 export function periodTitle(l: League, n: number): string {
 	if (l.periodStyle === 'innings') return `Inning ${n}`;
-	if (l.periodStyle === 'halves') return n === 1 ? 'First Half' : n === 2 ? 'Second Half' : 'Extra Time';
+	if (l.periodStyle === 'halves' && n <= 2) return n === 1 ? 'First Half' : 'Second Half';
+	if (l.sport === 'soccer') return 'Extra Time';
 	if (n <= l.regulationPeriods) return `${l.periodStyle === 'quarters' ? 'Quarter' : 'Period'} ${n}`;
 	return n - l.regulationPeriods === 1 ? 'Overtime' : `Overtime ${n - l.regulationPeriods}`;
 }
@@ -683,7 +688,7 @@ function soccerTable() {
 	return { columns: [['gamesPlayed', 'GP'], ['wins', 'W'], ['ties', 'D'], ['losses', 'L'], ['pointDifferential', 'GD'], ['points', 'PTS']] as [string, string][], rankBy: ['points', 'pointDifferential', 'pointsFor'] };
 }
 
-/** College football shows the AP poll (else ESPN's first poll) as a one-table standings: record and poll points. */
+/** College sports show the AP poll (else ESPN's first poll) as a one-table standings: record and poll points. */
 async function rankings(league: League): Promise<Standings> {
 	const polls: any[] = (await getJSON(`${base}${league.path}/rankings`)).rankings ?? [];
 	const poll = polls.find((p) => p.type === 'ap') ?? polls[0];
@@ -702,7 +707,7 @@ async function rankings(league: League): Promise<Standings> {
 }
 
 export async function standings(league: League): Promise<Standings> {
-	if (league.id === 'cfb') return rankings(league);
+	if (league.id === 'cfb' || league.id === 'ncaab') return rankings(league);
 	const spec = standingsSpecs[league.id];
 	// Standings live under /apis/v2, not the site API. Level 3 splits conferences into divisions.
 	const root = await getJSON(`https://site.api.espn.com/apis/v2/sports/${league.path}/standings${spec.level ? `?level=${spec.level}` : ''}`);
@@ -725,7 +730,7 @@ export async function standings(league: League): Promise<Standings> {
 
 /** The league's most recent finals, newest first: the current slate, else stepping back a day at a time, up to a week. */
 export async function recentResults(league: League, before: Date): Promise<Game[]> {
-	let finals = (await getJSON(`${base}${league.path}/scoreboard`)).events?.map((e: any) => parseEvent(e, league)).filter((g: Game) => g.status === 'final') ?? [];
+	let finals = (await getJSON(`${base}${league.path}/scoreboard?${league.query ?? ''}`)).events?.map((e: any) => parseEvent(e, league)).filter((g: Game) => g.status === 'final') ?? [];
 	for (let back = 1; back <= 7 && finals.length === 0; back++) {
 		const day = new Date(before);
 		day.setHours(0, 0, 0, 0);
@@ -742,10 +747,16 @@ export async function upcoming(league: League, days: number): Promise<Game[]> {
 	return pages.flat().filter((g) => g.status === 'scheduled' && !seen.has(g.id) && seen.add(g.id)).sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
 }
 
-/** Every team, from each league's standings, for search; loaded once, the first time someone searches. */
+/** Every Division I team, so any team can be found and followed come March, not only the ranked ones. */
+async function collegeTeams(l: League): Promise<{ league: League; team: Team }[]> {
+	const d = await getJSON(`${base}${l.path}/teams?groups=50&limit=500`);
+	return (d.sports?.[0]?.leagues?.[0]?.teams ?? []).map((t: any) => ({ league: l, team: parseTeam(t.team) }));
+}
+
+/** Every team, from each league's standings (college basketball: all of Division I), for search; loaded once, the first time someone searches. */
 let teamsPromise: Promise<{ league: League; team: Team }[]> | undefined;
 export function allTeams() {
-	teamsPromise ??= Promise.all(leagues.map((l) => standings(l).then((s) => s.groups.flatMap((g) => g.entries.map((e) => ({ league: l, team: e.team })))).catch(() => [])))
+	teamsPromise ??= Promise.all(leagues.map((l) => (l.id === 'ncaab' ? collegeTeams(l) : standings(l).then((s) => s.groups.flatMap((g) => g.entries.map((e) => ({ league: l, team: e.team }))))).catch(() => [])))
 		.then((all) => all.flat().sort((a, b) => a.team.displayName.localeCompare(b.team.displayName)));
 	return teamsPromise;
 }
@@ -768,7 +779,7 @@ export async function probabilities(game: Game): Promise<ProbabilityPoint[]> {
 }
 
 /** Seconds per regulation period for sports placed by their clock; others are spread evenly by play order. */
-const periodSeconds: Record<string, number> = { nfl: 900, nba: 720 };
+const periodSeconds: Record<string, number> = { nfl: 900, nba: 720, ncaab: 1200 };
 
 /** Seconds on the clock at a play: "m:ss", or plain seconds ("45.3") as basketball shows in a period's last minute. */
 export function clockSeconds(clock: string): number | undefined {

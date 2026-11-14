@@ -1,10 +1,18 @@
 <script lang="ts">
 	// ScoreCard from ScoreStyle.swift: logo and name outside, big scores, status in the middle.
 	import Football from './Football.svelte';
+	import FantasyBadge from './FantasyBadge.svelte';
+	import { roster, loadRoster } from './roster.svelte';
 	import { isFollowingTeam } from './follows.svelte';
 	import { type Game, type Competitor, headlineStatus, substatus, hasBall, isLosing, rankedName } from './espn';
 	// showsDate adds the local date under the status, for lists that span days (the Fantasy weeks).
 	let { game, showsDate = false }: { game: Game; showsDate?: boolean } = $props();
+
+	// Fantasy is NFL only; the roster loads once for every card (at most every 10 minutes).
+	$effect(() => {
+		if (game.league.id === 'nfl') loadRoster();
+	});
+	const yours = (c: Competitor) => (game.league.id === 'nfl' ? roster.players.filter((p) => p.team === c.team.abbreviation) : []);
 </script>
 
 {#snippet side(c: Competitor)}
@@ -13,6 +21,11 @@
 			<img src={c.team.logo} alt="" width="40" height="40" />
 			{#if isFollowingTeam(game.league.id, c.team.id)}
 				<svg class="star" viewBox="0 0 20 20" width="9" height="9" role="img" aria-label="Following"><path d="M10 2.5l2.2 4.6 5 .6-3.7 3.5 1 5L10 13.8 5.5 16.2l1-5L2.8 7.7l5-.6z" fill="currentColor" /></svg>
+			{/if}
+			<!-- Your fantasy players on this team: the jersey badge by the logo, their names on hover. -->
+			{#if yours(c).length}
+				{@const names = yours(c).map((p) => p.name).join(', ')}
+				<span class="mine" title={names}><FantasyBadge size={15} label="Your fantasy players: {names}" /></span>
 			{/if}
 		</span>
 		<span class="name">{rankedName(c)}</span>
@@ -71,6 +84,12 @@
 		position: absolute;
 		top: -2px;
 		right: -8px;
+	}
+	.mine {
+		position: absolute;
+		bottom: -3px;
+		left: -9px;
+		display: flex;
 	}
 	.name {
 		font-size: var(--subheadline);

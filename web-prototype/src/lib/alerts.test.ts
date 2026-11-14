@@ -2,7 +2,7 @@
 // Cases from SportsKit's NotificationTests, so both apps alert alike.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { EventDetector, isQuiet, compactScore, withLastKnown } from './alerts.ts';
+import { EventDetector, isQuiet, compactScore, withLastKnown, resolvedAlert, scopePrefix, applies } from './alerts.ts';
 
 const league = { id: 'nfl', name: 'NFL', abbreviation: 'NFL', path: '', sport: 'football', regulationPeriods: 4, periodStyle: 'quarters' };
 const team = (id) => ({ id, abbreviation: id, displayName: id, shortName: id });
@@ -49,4 +49,19 @@ test('a league whose fetch failed keeps its last games, so the next poll still s
 	const last = [game(), game({ id: '2', league: nba })];
 	const fresh = withLastKnown(['nfl', 'nba'], [{ status: 'fulfilled', value: [game({ away: { team: team('WSH'), score: 10, periodScores: [] } })] }, { status: 'rejected', reason: new Error() }], last);
 	assert.deepEqual(fresh.map((g) => [g.id, g.away.score]), [['1', 10], ['2', 3]]);
+});
+
+test('a team setting beats its league, which beats the global one', () => {
+	const s = { alerts: { scoreUpdate: true, final: true }, overrides: { [scopePrefix('nfl') + 'scoreUpdate']: false, [scopePrefix('nfl', '25') + 'scoreUpdate']: true } };
+	assert.equal(resolvedAlert(s, 'scoreUpdate', 'nfl', '25'), true); // the team's own
+	assert.equal(resolvedAlert(s, 'scoreUpdate', 'nfl', '9'), false); // falls back to the league
+	assert.equal(resolvedAlert(s, 'scoreUpdate', 'nhl', '25'), true); // same ID in another league: global
+	assert.equal(resolvedAlert(s, 'final', 'nfl', '25'), true);
+	assert.equal(applies('redZone', { ...league, sport: 'hockey' }), false);
+});
+
+test('college basketball plays halves and overtime in the menu bar', () => {
+	const ncaab = { ...league, id: 'ncaab', sport: 'basketball', regulationPeriods: 2, periodStyle: 'halves' };
+	assert.equal(compactScore(game({ league: ncaab, period: 2 })), 'WSH 3 – 7 SF · H2');
+	assert.equal(compactScore(game({ league: ncaab, period: 3 })), 'WSH 3 – 7 SF · OT');
 });

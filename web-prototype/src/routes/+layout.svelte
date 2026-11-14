@@ -1,5 +1,6 @@
 <script lang="ts">
 	// ContentView.swift's sidebar: Home and Fantasy, search, followed leagues then teams, every league, Settings.
+	import { jersey } from '$lib/FantasyBadge.svelte';
 	import { page } from '$app/state';
 	import { inTauri as isTauri } from '$lib/platform';
 	import { leagues, leagueLogo, allTeams, orderLeagues, moveLeague, type League, type Team } from '$lib/espn';
@@ -14,7 +15,7 @@
 	const isPanel = page.url.pathname === '/tray';
 	const items = [
 		{ href: '/', title: 'Home', icon: 'M3 8.5 10 3l7 5.5V17h-4.5v-5h-5v5H3z' },
-		{ href: '/fantasy', title: 'Fantasy', icon: 'M10 2.5l2.2 4.6 5 .6-3.7 3.5 1 5L10 13.8 5.5 16.2l1-5L2.8 7.7l5-.6z' }
+		{ href: '/fantasy', title: 'Fantasy', icon: jersey }
 	];
 	// A game page belongs to Home; a team page is its own row when followed, else its league's.
 	const current = $derived.by(() => {
@@ -85,7 +86,7 @@
 		<div class="rows">
 			{#each items as item}
 				<a class="main" href={item.href} class:on={current === item.href} aria-current={current === item.href ? 'page' : undefined}>
-					<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d={item.icon} fill="currentColor" /></svg>
+					<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d={item.icon} fill="currentColor" fill-rule="evenodd" /></svg>
 					{item.title}
 				</a>
 			{/each}

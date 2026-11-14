@@ -4,7 +4,7 @@ import { goto } from '$app/navigation';
 import { leagues, scoreboard, startOfDay, type Game } from './espn';
 import { follows, isFollowingTeam, teamKey } from './follows.svelte';
 import { settings } from './settings.svelte';
-import { EventDetector, applies, compactScore, isQuiet, withLastKnown, type GameEvent } from './alerts';
+import { EventDetector, applies, compactScore, isQuiet, resolvedAlert, withLastKnown, type GameEvent } from './alerts';
 
 let games: Game[] = [];
 const detector = new EventDetector();
@@ -30,12 +30,13 @@ function saveHeld() {
 const includes = (g: Game) =>
 	isFollowingTeam(g.league.id, g.home.team.id) || isFollowingTeam(g.league.id, g.away.team.id) || follows.leagues.includes(g.league.id);
 
-/** Followed teams decide (any unmuted one); otherwise a followed league does. */
+/** Followed teams decide (any unmuted one that wants it); otherwise a followed league does (NotificationRules). */
 function shouldNotify(e: GameEvent, g: Game): boolean {
-	if (!settings.alerts[e.type] || !applies(e.type, g)) return false;
-	const teams = [g.home.team.id, g.away.team.id].filter((id) => isFollowingTeam(g.league.id, id));
-	if (teams.length) return teams.some((id) => !settings.muted.includes(teamKey(g.league.id, id)));
-	return follows.leagues.includes(g.league.id);
+	const l = g.league.id;
+	if (!applies(e.type, g.league)) return false;
+	const teams = [g.home.team.id, g.away.team.id].filter((id) => isFollowingTeam(l, id));
+	if (teams.length) return teams.some((id) => !settings.muted.includes(teamKey(l, id)) && resolvedAlert(settings, e.type, l, id));
+	return follows.leagues.includes(l) && resolvedAlert(settings, e.type, l);
 }
 
 // Sent alerts, so a refresh or relaunch never repeats one; kept a week.
@@ -201,12 +202,17 @@ async function updateTray() {
 	await sendToPanel();
 }
 
+/** Puts the icon picked in Settings on the Dock (macOS) or window and taskbar (Windows). */
+export const applyAppIcon = () =>
+	import('@tauri-apps/api/core').then((c) => c.invoke('set_app_icon', { dark: settings.appIcon === 'dark' })).catch((e) => console.error('App icon failed:', e));
+
 /** Starts polling, the tray and Close to Menu; call once, in the desktop app. */
 export async function startLive() {
 	// Once per app run, even across dev reloads of this module.
 	const w = window as unknown as { halftimeLive?: boolean };
 	if (w.halftimeLive) return;
 	w.halftimeLive = true;
+	applyAppIcon();
 	const { getCurrentWindow } = await import('@tauri-apps/api/window');
 	getCurrentWindow().onCloseRequested((e) => {
 		if (!settings.closeToMenu) return;

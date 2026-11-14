@@ -1,6 +1,6 @@
 // Ported from SportsKit's GameEventDetector, NotificationRules and QuietHours: turns two snapshots of a game into
 // alert-worthy events, decides which to send, and holds them through quiet hours.
-import type { Game } from './espn';
+import type { Game, League } from './espn';
 
 export type EventType = 'gameStart' | 'scoreUpdate' | 'periodEnd' | 'halftime' | 'final' | 'redZone' | 'closeGame' | 'overtime' | 'leadChange';
 export type GameEvent = { type: EventType; key: string; headline: string; body: string };
@@ -18,8 +18,7 @@ export const events: { type: EventType; title: string; onByDefault: boolean }[] 
 ];
 
 /** Innings and halves would spam or duplicate halftime; red zone is football only. */
-export function applies(type: EventType, game: Game): boolean {
-	const l = game.league;
+export function applies(type: EventType, l: League): boolean {
 	switch (type) {
 		case 'redZone': return l.sport === 'football';
 		case 'closeGame': return l.sport !== 'soccer' && l.sport !== 'baseball';
@@ -29,6 +28,14 @@ export function applies(type: EventType, game: Game): boolean {
 	}
 }
 
+/** Where a league's or followed team's own alert setting is kept, as NotificationPreference's scopes. */
+export const scopePrefix = (leagueID: string, teamID?: string) => (teamID ? `team/${leagueID}:${teamID}/` : `league/${leagueID}/`);
+
+/** The setting in effect: the team's own, else its league's, else the one for everything (NotificationRules.resolved). */
+export function resolvedAlert(s: { alerts: Record<EventType, boolean>; overrides: Record<string, boolean> }, type: EventType, leagueID: string, teamID?: string): boolean {
+	return (teamID ? s.overrides[scopePrefix(leagueID, teamID) + type] : undefined) ?? s.overrides[scopePrefix(leagueID) + type] ?? s.alerts[type];
+}
+
 /** e.g. "WSH 3 – 27 SF · 7:25 - 3rd" */
 export const scoreLine = (g: Game) => `${g.away.team.abbreviation} ${g.away.score ?? 0} – ${g.home.score ?? 0} ${g.home.team.abbreviation} · ${g.statusDetail}`;
 
@@ -36,19 +43,19 @@ export const scoreLine = (g: Game) => `${g.away.team.abbreviation} ${g.away.scor
 export function compactPeriod(g: Game): string {
 	if (g.statusName === 'STATUS_HALFTIME') return 'Half';
 	const l = g.league;
-	if (l.periodStyle === 'halves' || l.periodStyle === 'innings') return g.statusDetail;
+	if (l.sport === 'soccer' || l.periodStyle === 'innings') return g.statusDetail;
 	if (g.period > l.regulationPeriods) {
 		const ot = g.period - l.regulationPeriods;
 		return ot === 1 ? 'OT' : `${ot}OT`;
 	}
-	return `${l.periodStyle === 'quarters' ? 'Q' : 'P'}${g.period}`;
+	return `${l.periodStyle === 'quarters' ? 'Q' : l.periodStyle === 'halves' ? 'H' : 'P'}${g.period}`;
 }
 
 /** Menu bar text, e.g. "WSH 3 – 13 SF · Q2". */
 export const compactScore = (g: Game) => `${g.away.team.abbreviation} ${g.away.score ?? 0} – ${g.home.score ?? 0} ${g.home.team.abbreviation} · ${compactPeriod(g)}`;
 
 const closeGame: Record<string, { margin: number; seconds: number }> = {
-	nfl: { margin: 8, seconds: 300 }, cfb: { margin: 8, seconds: 300 }, nba: { margin: 5, seconds: 120 }, wnba: { margin: 5, seconds: 120 }, nhl: { margin: 1, seconds: 300 }
+	nfl: { margin: 8, seconds: 300 }, cfb: { margin: 8, seconds: 300 }, nba: { margin: 5, seconds: 120 }, wnba: { margin: 5, seconds: 120 }, ncaab: { margin: 5, seconds: 120 }, nhl: { margin: 1, seconds: 300 }
 };
 
 /** Within the league's margin with its last minutes left in the final regulation period or later. */

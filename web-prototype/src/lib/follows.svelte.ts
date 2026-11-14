@@ -1,6 +1,7 @@
 // Followed leagues and teams, as SportsKit's FollowedLeague / FollowedTeam, shared live by every page.
 // shortcut: kept in localStorage (the app's own WebKit / WebView2 storage in Tauri); move to a file or SQLite via Tauri if it needs syncing or backup.
 import type { Team } from './espn';
+import { settings, clearOverrides } from './settings.svelte';
 
 export type FollowedTeam = { leagueID: string; team: Team };
 type Saved = { leagues: string[]; teams: FollowedTeam[] };
@@ -33,11 +34,17 @@ export const isFollowingLeague = (leagueID: string) => follows.leagues.includes(
 export const isFollowingTeam = (leagueID: string, teamID: string) => follows.teams.some((t) => t.leagueID === leagueID && t.team.id === teamID);
 
 export function toggleLeague(leagueID: string) {
+	// Unfollowing forgets its alert settings, so following again starts from the defaults (as the Swift app).
+	if (isFollowingLeague(leagueID)) clearOverrides(leagueID);
 	follows.leagues = isFollowingLeague(leagueID) ? follows.leagues.filter((id) => id !== leagueID) : [...follows.leagues, leagueID];
 	save();
 }
 
 export function toggleTeam(leagueID: string, team: Team) {
+	if (isFollowingTeam(leagueID, team.id)) {
+		settings.muted = settings.muted.filter((k) => k !== teamKey(leagueID, team.id));
+		clearOverrides(leagueID, team.id); // saves both
+	}
 	follows.teams = isFollowingTeam(leagueID, team.id)
 		? follows.teams.filter((t) => !(t.leagueID === leagueID && t.team.id === team.id))
 		: [...follows.teams, { leagueID, team: { id: team.id, abbreviation: team.abbreviation, displayName: team.displayName, shortName: team.shortName, color: team.color, alternateColor: team.alternateColor, logo: team.logo } }];

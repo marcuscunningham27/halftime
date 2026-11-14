@@ -128,7 +128,7 @@ export function quickQuestions(leagueID: string): QuickQuestion[] {
 			q('How did turnovers change the game?', { kind: 'teamStats', labels: ['Turnovers', 'Fumbles lost', 'Interceptions thrown'] }),
 			q('What were the key scoring drives?', { kind: 'scoringDrives' })
 		];
-		case 'nba': case 'wnba': return [
+		case 'nba': case 'wnba': case 'ncaab': return [
 			q("Who's the top scorer?", { kind: 'leaders', categories: ['points'] }),
 			q('How are the teams shooting from three?', { kind: 'teamStats', labels: ['3PT', 'Three Point %'] }),
 			q('Who leads in rebounds and assists?', { kind: 'leaders', categories: ['rebounds', 'assists'] }),

@@ -10,9 +10,10 @@
 	import { follows } from '$lib/follows.svelte';
 	import { store } from '$lib/fantasy';
 	import { teamKey } from '$lib/follows.svelte';
-	import { settings, saveSettings } from '$lib/settings.svelte';
-	import { events } from '$lib/alerts';
+	import { settings, saveSettings, setOverride, clearOverrides } from '$lib/settings.svelte';
+	import { events, applies, resolvedAlert } from '$lib/alerts';
 	import { getKey, setKey, model } from '$lib/claude';
+	import { applyAppIcon } from '$lib/live';
 
 	const tabs = ['General', 'Notifications', 'Following', 'Fantasy', 'Summaries'] as const;
 	let tab = $state<(typeof tabs)[number]>('General');
@@ -40,6 +41,9 @@
 		saveSettings();
 	}
 	let fantasyLeagues = $state(store.leagues());
+	/** Following rows opened to show their own alert settings. */
+	let expanded = $state<string[]>([]);
+	const toggleOpen = (id: string) => (expanded = expanded.includes(id) ? expanded.filter((x) => x !== id) : [...expanded, id]);
 
 	// Summaries: the Anthropic key, kept in the Keychain (Credential Manager on Windows), never shown once saved.
 	let hasKey = $state(false);
@@ -75,6 +79,23 @@
 		</label>
 	{/snippet}
 
+	{#snippet chevron(id: string, label: string)}
+		<button class="chevron" class:open={expanded.includes(id)} aria-label={label} aria-expanded={expanded.includes(id)} onclick={() => toggleOpen(id)}>
+			<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+		</button>
+	{/snippet}
+
+	<!-- A league's or team's own alerts (SettingsView's EventToggles), only the kinds its sport has. -->
+	{#snippet scopeAlerts(leagueID: string, teamID: string | undefined, reset: string)}
+		{@const l = leagueOf(leagueID)}
+		<div class="scope">
+			{#each events.filter((e) => !l || applies(e.type, l)) as event (event.type)}
+				{@render toggle(event.title, resolvedAlert(settings, event.type, leagueID, teamID), (on) => setOverride(event.type, on, leagueID, teamID))}
+			{/each}
+			<button class="glass reset" onclick={() => clearOverrides(leagueID, teamID)}>{reset}</button>
+		</div>
+	{/snippet}
+
 	{#if !inTauri && (tab === 'General' || tab === 'Notifications')}
 		<p class="footnote">These settings take effect in the desktop app, which runs the menu-bar score and alerts.</p>
 	{/if}
@@ -86,6 +107,19 @@
 			<hr />
 			{@render toggle('Close to Menu', settings.closeToMenu, (on) => ((settings.closeToMenu = on), saveSettings()))}
 			<p class="footnote">Closing the window leaves Halftime in the menu bar (the system tray on Windows). Scores and alerts keep coming.</p>
+			<hr />
+			<div class="toggle-row">
+				<span>App icon</span>
+				<span class="icons" role="radiogroup" aria-label="App icon">
+					{#each [['dark', 'Dark'], ['light', 'Light']] as [value, label]}
+						<button class="icon-choice" class:on={settings.appIcon === value} role="radio" aria-checked={settings.appIcon === value} disabled={!inTauri}
+							onclick={() => ((settings.appIcon = value as 'dark' | 'light'), saveSettings(), applyAppIcon())}>
+							<img src="/icon-{value}.png" alt="" width="44" height="44" />{label}
+						</button>
+					{/each}
+				</span>
+			</div>
+			<p class="footnote">The Dock icon on a Mac (Finder shows the light one), the window and taskbar icon on Windows.</p>
 			<hr />
 			<label class="toggle-row">
 				<span>Units</span>
@@ -103,7 +137,7 @@
 				{#if i > 0}<hr />{/if}
 				{@render toggle(event.title, settings.alerts[event.type], (on) => ((settings.alerts[event.type] = on), saveSettings()))}
 			{/each}
-			<p class="footnote">These apply to everything you follow. Mute a team under Following.</p>
+			<p class="footnote">These apply to everything you follow. Under Following, a league or team can have its own, or be muted.</p>
 		</section>
 		<section class="sports-card">
 			{@render toggle('Quiet hours', settings.quietHours.enabled, (on) => ((settings.quietHours.enabled = on), saveSettings()))}
@@ -132,10 +166,14 @@
 					{#if l}
 						{#if i > 0}<hr />{/if}
 						<div class="row">
+							{@render chevron(`league/${id}`, `${l.name} alerts`)}
 							<img src={leagueLogo(l)} alt="" width="22" height="22" />
 							<a class="grow" href="/league?league={id}">{l.name}</a>
 							<FollowButton leagueID={id} name={l.abbreviation} />
 						</div>
+						{#if expanded.includes(`league/${id}`)}
+							{@render scopeAlerts(id, undefined, 'Use Default Alerts')}
+						{/if}
 					{/if}
 				{/each}
 			</section>
@@ -145,16 +183,21 @@
 				<h2>Teams</h2>
 				{#each follows.teams as { leagueID, team }, i (leagueID + team.id)}
 					{#if i > 0}<hr />{/if}
+					{@const muted = settings.muted.includes(teamKey(leagueID, team.id))}
 					<div class="row">
+						{@render chevron(`team/${leagueID}:${team.id}`, `${team.displayName} alerts`)}
 						<img src={team.logo} alt="" width="22" height="22" />
 						<a class="grow two" href="/league?league={leagueID}&team={team.id}"><span>{team.displayName}</span><small>{leagueOf(leagueID)?.abbreviation}</small></a>
-						<label class="mute"><input type="checkbox" role="switch" checked={settings.muted.includes(teamKey(leagueID, team.id))} onchange={() => toggleMute(teamKey(leagueID, team.id))} />Mute</label>
+						<label class="mute"><input type="checkbox" role="switch" checked={muted} onchange={() => toggleMute(teamKey(leagueID, team.id))} />Mute</label>
 						<FollowButton {leagueID} {team} name={team.shortName} />
 					</div>
+					{#if expanded.includes(`team/${leagueID}:${team.id}`) && !muted}
+						{@render scopeAlerts(leagueID, team.id, 'Use League Alerts')}
+					{/if}
 				{/each}
 			</section>
 		{/if}
-		<p class="footnote">Followed teams come first on Home under My Teams and in the menu bar. A muted team sends no alerts.</p>
+		<p class="footnote">Followed teams come first on Home under My Teams and in the menu bar. Open a row for its own alerts: a team’s override its league’s, which override Notifications. A muted team sends none.</p>
 	{:else if tab === 'Fantasy'}
 		<LeagueSetup bind:leagues={fantasyLeagues} onclose={() => goto('/fantasy')} />
 	{:else}
@@ -326,6 +369,51 @@
 	}
 	.error {
 		color: #ff6961;
+	}
+	.icons {
+		display: flex;
+		gap: 10px;
+	}
+	.icon-choice {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 2px;
+		padding: 4px;
+		border-radius: 12px;
+		font-size: var(--caption);
+		color: var(--secondary);
+		outline: 2px solid transparent;
+	}
+	.icon-choice.on {
+		outline-color: #30d158;
+		color: var(--label);
+	}
+	.icon-choice:disabled {
+		opacity: 0.6;
+	}
+	.chevron {
+		width: 22px;
+		height: 22px;
+		display: grid;
+		place-items: center;
+		color: var(--secondary);
+		transition: transform 0.15s;
+	}
+	.chevron.open {
+		transform: rotate(90deg);
+	}
+	.scope {
+		margin: 0 0 8px 32px;
+		display: flex;
+		flex-direction: column;
+	}
+	.reset {
+		align-self: flex-start;
+		margin-top: 6px;
+		padding: 5px 14px;
+		border-radius: 999px;
+		font-size: var(--subheadline);
 	}
 	.mute {
 		display: flex;

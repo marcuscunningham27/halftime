@@ -8,7 +8,7 @@
 	let { game, plays, court, children }: { game: Game; plays: Play[]; court?: Court; children: Snippet } = $props();
 
 	/** NFL teams get three timeouts a half, NBA teams seven a game, WNBA teams five. */
-	const timeoutsPerGame = $derived(game.league.sport === 'football' ? 3 : game.league.id === 'wnba' ? 5 : 7);
+	const timeoutsPerGame = $derived(game.league.sport === 'football' ? 3 : game.league.id === 'wnba' ? 5 : game.league.id === 'ncaab' ? 4 : 7);
 	const ppTeam = $derived(court?.powerPlay ? [game.away.team, game.home.team].find((t) => t.id === powerPlayTeam(plays, game.away.team.id, game.home.team.id)) : undefined);
 	const showsSides = $derived(!!court && [court.away, court.home].some((s) => s.timeoutsLeft !== undefined || s.fouls !== undefined));
 

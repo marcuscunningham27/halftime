@@ -27,6 +27,8 @@
     "core:window:allow-destroy",
     "core:app:allow-default-window-icon",
     "core:window:allow-set-position",
-    "core:window:allow-set-size"
+    "core:window:allow-set-size",
+    "core:window:allow-start-dragging",
+    "core:window:allow-internal-toggle-maximize"
   ]
 }
