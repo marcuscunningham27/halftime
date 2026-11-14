@@ -1,11 +1,11 @@
-# Builds the Tauri prototype's Windows installer, so it can be tried on a PC without installing Rust or Node there.
+# Builds Halftime's Windows installer, so it can be tried on a PC without installing Rust or Node there.
 # Download it from the run's Artifacts. It's unsigned: Windows SmartScreen asks once (More info › Run anyway).
-name: Prototype Windows build
+name: Windows build
 
 on:
   workflow_dispatch:
   push:
-    branches: [main, web-prototype]
+    branches: [main]
     paths: ['web-prototype/**', '.github/workflows/prototype-windows.yml']
 
 jobs:
