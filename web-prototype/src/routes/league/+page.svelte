@@ -1,7 +1,6 @@
 <script lang="ts">
 	// ScoreboardView.swift: a league (or, with ?team=, one team) for a chosen day in cards: live, upcoming, then results.
 	// On today it also shows recent results grouped by day, then the standings; Upcoming lists the games ahead.
-	// shortcut: no date picker field yet; Previous / Today / Next cover changing day.
 	import { page } from '$app/state';
 	import Backdrop from '$lib/Backdrop.svelte';
 	import GlassPicker from '$lib/GlassPicker.svelte';
@@ -73,6 +72,15 @@
 		showsUpcoming = day === 'Upcoming';
 		offset = day === 'Yesterday' ? -1 : 0;
 	}
+	/** The shown day as the date field's value (local, YYYY-MM-DD). */
+	const dateValue = $derived(startOfDay(offset).toLocaleDateString('en-CA'));
+	function pick(value: string) {
+		const [y, m, d] = value.split('-').map(Number);
+		if (!y || !m || !d) return;
+		showsUpcoming = false;
+		// Rounded, so a daylight-saving change in between doesn't land a day off.
+		offset = Math.round((new Date(y, m - 1, d).getTime() - startOfDay(0).getTime()) / 86_400_000);
+	}
 	function shift(by: number) {
 		showsUpcoming = false;
 		offset += by;
@@ -115,6 +123,8 @@
 				<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
 			</button>
 		</div>
+		<!-- DatePicker in ScoreboardView.swift: type or pick from the calendar. -->
+		<input class="date glass" type="date" aria-label="Date" value={dateValue} onchange={(e) => pick(e.currentTarget.value)} />
 		{#if teamID}
 			{#if team}<span class="glass round-wrap"><FollowButton leagueID={league.id} {team} name={team.shortName} glass /></span>{/if}
 		{:else}
@@ -249,6 +259,22 @@
 	}
 	.group button:disabled {
 		color: var(--tertiary);
+	}
+	.date {
+		height: 32px;
+		box-sizing: border-box;
+		padding: 0 12px;
+		border-radius: 999px;
+		font: inherit;
+		font-size: var(--subheadline);
+		font-variant-numeric: tabular-nums;
+		color: var(--label);
+		color-scheme: dark;
+		user-select: text;
+		-webkit-user-select: text;
+	}
+	.date:focus {
+		outline: 3px solid rgba(10, 132, 255, 0.55);
 	}
 	main {
 		max-width: 760px;

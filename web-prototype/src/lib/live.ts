@@ -82,7 +82,7 @@ async function fetchToday(): Promise<Game[]> {
 
 // MARK: The menu-bar item.
 
-let tray: import('@tauri-apps/api/tray').TrayIcon | undefined;
+let trayPromise: Promise<import('@tauri-apps/api/tray').TrayIcon> | undefined;
 
 /** The Dock icon shows with the window and hides with it in Close to Menu (macOS; a no-op elsewhere). */
 const setDockVisible = async (visible: boolean) => (await import('@tauri-apps/api/core')).invoke('set_dock_visible', { visible });
@@ -126,16 +126,12 @@ async function togglePanel(icon: { position: { x: number; y: number }; size: { w
 	await panel.setFocus();
 }
 
-async function updateTray() {
-	const pinned = games.find((g) => includes(g) && g.status === 'live');
-	if (!tray) {
+/** Makes the menu-bar item once, however many updates ask for it at the same moment. */
+function createTray(): Promise<import('@tauri-apps/api/tray').TrayIcon> {
+	trayPromise ??= (async () => {
 		const { TrayIcon } = await import('@tauri-apps/api/tray');
-		// A dev reload re-runs this module; reuse the tray it made rather than adding a second.
-		tray = (await TrayIcon.getById('halftime')) ?? undefined;
-		if (tray) await tray.setShowMenuOnLeftClick(false);
-	}
-	if (!tray) {
-		const { TrayIcon } = await import('@tauri-apps/api/tray');
+		// A page reload leaves the old item behind with handlers into the discarded page, so clicks would do nothing; replace it.
+		await TrayIcon.removeById('halftime').catch(() => {});
 		const { Menu } = await import('@tauri-apps/api/menu');
 		const { defaultWindowIcon } = await import('@tauri-apps/api/app');
 		// Left click opens the panel; right click keeps a short menu, the only place to quit while the window is closed.
@@ -149,8 +145,8 @@ async function updateTray() {
 		});
 		// The Mac menu bar gets a black pitch outline that macOS tints to match it (a template image); Windows' tray keeps the app icon.
 		const mac = navigator.userAgent.includes('Mac');
-		const icon = mac ? new Uint8Array(await (await fetch('/tray-template.png')).arrayBuffer()) : ((await defaultWindowIcon()) ?? undefined);
-		tray = await TrayIcon.new({
+		const icon = mac ? (pitchIcon = new Uint8Array(await (await fetch('/tray-template.png')).arrayBuffer())) : ((await defaultWindowIcon()) ?? undefined);
+		return TrayIcon.new({
 			id: 'halftime',
 			icon,
 			iconAsTemplate: mac,
@@ -161,6 +157,22 @@ async function updateTray() {
 				if (e.type === 'Click' && e.button === 'Left' && e.buttonState === 'Up') togglePanel(e.rect).catch((err) => console.error('Menu-bar panel failed:', err));
 			}
 		});
+	})();
+	trayPromise.catch(() => (trayPromise = undefined));
+	return trayPromise;
+}
+
+/** The Mac menu-bar pitch; set only on macOS, where it steps aside for a live score as the Swift app's does. */
+let pitchIcon: Uint8Array | undefined;
+let iconHidden = false;
+
+async function updateTray() {
+	const pinned = games.find((g) => includes(g) && g.status === 'live');
+	const tray = await createTray();
+	if (pitchIcon && iconHidden !== !!pinned) {
+		iconHidden = !!pinned;
+		await tray.setIcon(pinned ? null : pitchIcon);
+		if (!pinned) await tray.setIconAsTemplate(true);
 	}
 	// macOS shows the title beside the icon; Windows has no tray text, so the score goes in the hover tooltip there.
 	await tray.setTitle(pinned ? compactScore(pinned) : null);
