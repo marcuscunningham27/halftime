@@ -5054,7 +5054,7 @@ dependencies = [
 
 [[package]]
 name = "web-prototype"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "keyring",
  "objc2",
