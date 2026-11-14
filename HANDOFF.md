@@ -60,7 +60,7 @@ checked in the running app, then reported back. Commit and push only when the us
   `~/Library/Caches/halftime-prototype-target/release/bundle/macos/Halftime.app` to `/Applications` (quit it first).
   The bundle ID is `com.halftime.prototype`; keep it, or saved follows and Keychain secrets won't carry over.
 - Windows: GitHub Actions (`.github/workflows/prototype-windows.yml`) builds an unsigned NSIS installer on every
-  push to `main` or `web-prototype` that touches `web-prototype/`; download it from the run's Artifacts
+  push to `main` that touches `web-prototype/`; download it from the run's Artifacts
   (SmartScreen: More info › Run anyway).
 
 ## Gotchas
