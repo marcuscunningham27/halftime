@@ -1,0 +1,85 @@
+# Publishes Halftime for download: push a tag like v1.0.0 and GitHub builds the Mac and Windows installers, then
+# attaches them to a release under fixed names, so the README's buttons
+# (releases/latest/download/Halftime-Mac.dmg and Halftime-Windows.exe) always fetch the newest one.
+# Both are unsigned (no paid Apple or Microsoft certificate); the README explains the one-time "open anyway" step.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: web-prototype
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web-prototype/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: web-prototype/src-tauri
+      - run: npm ci
+      - run: npm test
+      - run: npx tauri build --bundles nsis
+      - name: Name the installer
+        shell: bash
+        run: cp src-tauri/target/release/bundle/nsis/*.exe Halftime-Windows.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: web-prototype/Halftime-Windows.exe
+          if-no-files-found: error
+
+  mac:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: web-prototype
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web-prototype/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          # One app for Apple Silicon and Intel Macs.
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: web-prototype/src-tauri
+      - run: npm ci
+      - run: npx tauri build --target universal-apple-darwin --bundles dmg
+      - name: Name the disk image
+        run: cp src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg Halftime-Mac.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac
+          path: web-prototype/Halftime-Mac.dmg
+          if-no-files-found: error
+
+  release:
+    needs: [windows, mac]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" Halftime-Mac.dmg Halftime-Windows.exe \
+            --repo "$GITHUB_REPOSITORY" --title "Halftime $TAG" --generate-notes

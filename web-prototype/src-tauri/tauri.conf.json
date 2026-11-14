@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Halftime",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "identifier": "com.halftime.prototype",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -70,7 +70,8 @@
       "files": {
         "Resources/Assets.car": "icons/Assets.car"
       },
-      "infoPlist": "Info.plist"
+      "infoPlist": "Info.plist",
+      "signingIdentity": "-"
     }
   }
 }

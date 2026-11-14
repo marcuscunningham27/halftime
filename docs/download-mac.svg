@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="64" viewBox="0 0 300 64">
+<rect x="1" y="1" width="298" height="62" rx="31.0" fill="#1fc25b"/>
+<path d="M34 22v18m-7-7 7 7 7-7M26 45h16" fill="none" stroke="#0b0b0b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="164.0" y="39.0" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" font-weight="700" fill="#0b0b0b">Download for Mac</text>
+</svg>
