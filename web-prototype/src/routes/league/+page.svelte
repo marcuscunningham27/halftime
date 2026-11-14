@@ -100,14 +100,14 @@
 		for (const g of list) groups.set(dayKey(g.startDate), [...(groups.get(dayKey(g.startDate)) ?? []), g]);
 		return [...groups];
 	}
-	const subtitle = $derived(showsUpcoming ? 'Coming up' : startOfDay(offset).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }));
+	const subtitle = $derived(showsUpcoming ? 'Coming up' : startOfDay(offset).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })); // short: the date field beside it has the full date
 	const teamLink = (id: string) => `/league?league=${league.id}&team=${id}`;
 </script>
 
 <svelte:head><title>{title || league.abbreviation} · Halftime</title></svelte:head>
 <Backdrop color="#0d1f45" />
 
-<header data-tauri-drag-region>
+<header class="head" data-tauri-drag-region>
 	<div class="titles" data-tauri-drag-region>
 		<h1>{#if !teamID}<img src={leagueLogo(league)} alt="" width="24" height="24" />{:else if team?.logo}<img src={team.logo} alt="" width="26" height="26" />{/if}{title}</h1>
 		<span class="subtitle">{subtitle}</span>
@@ -204,11 +204,14 @@
 </main>
 
 <style>
-	header {
+	/* The title row lines up with the buttons (and with Home's title); the date hangs below it. Scoped under .content
+	   to win over the layout's shared header rule. */
+	:global(.content) > header.head {
 		min-height: 52px;
 		justify-content: space-between;
+		align-items: flex-start;
 		gap: 12px;
-		padding: 6px 16px 6px var(--titlebar-inset);
+		padding: 10px 16px 6px var(--titlebar-inset);
 		box-sizing: border-box;
 	}
 	.titles {
@@ -221,6 +224,7 @@
 		align-items: center;
 		gap: 8px;
 		margin: 0;
+		min-height: 32px;
 		font-size: 17px;
 		font-weight: 700;
 		white-space: nowrap;
@@ -229,8 +233,12 @@
 		filter: drop-shadow(0 0 0.6px rgba(255, 255, 255, 0.9));
 	}
 	.subtitle {
+		margin-top: -4px;
 		font-size: var(--subheadline);
 		color: var(--secondary);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 	.controls {
 		display: flex;

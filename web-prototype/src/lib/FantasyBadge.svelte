@@ -8,7 +8,8 @@
 </script>
 
 <!-- Marks your fantasy players: a black jersey on a yellow disc. -->
-<svg class="badge" viewBox="0 0 20 20" width={size} height={size} role="img" aria-label={label}>
+<!-- An empty label makes it decorative (beside a title that already says Fantasy). -->
+<svg class="badge" viewBox="0 0 20 20" width={size} height={size} role={label ? 'img' : undefined} aria-label={label || undefined} aria-hidden={label ? undefined : 'true'}>
 	<circle cx="10" cy="10" r="9.5" fill="#ffd60a" />
 	<path d={jersey} fill="#000" fill-rule="evenodd" transform="translate(10 10.3) scale(.64) translate(-10 -10)" />
 </svg>

@@ -7,6 +7,7 @@
 	import FantasySeason from '$lib/FantasySeason.svelte';
 	import FantasyNews from '$lib/FantasyNews.svelte';
 	import WeekBriefing from '$lib/WeekBriefing.svelte';
+	import FantasyBadge from '$lib/FantasyBadge.svelte';
 	import { nflWeek, summary, type Game, type GameDetail } from '$lib/espn';
 	import * as F from '$lib/fantasy';
 
@@ -179,6 +180,7 @@
 <header data-tauri-drag-region>
 	<div class="menu">
 		<button class="title" onclick={() => (menuOpen = !menuOpen)} aria-haspopup="menu" aria-expanded={menuOpen}>
+			<FantasyBadge size={24} label="" />
 			{active?.name ?? 'Fantasy'}
 			<svg viewBox="0 0 12 12" width="9" height="9" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
 		</button>
@@ -324,13 +326,16 @@
 	.menu {
 		position: relative;
 	}
+	/* The same size as a league page's title, the jersey standing in for the league logo. The padding is pulled back
+	   so the badge lines up where a league logo starts; it's only there for the hover highlight. */
 	.title {
 		display: flex;
 		align-items: center;
 		gap: 8px;
-		padding: 6px 10px;
-		border-radius: 8px;
-		font-size: var(--headline);
+		margin-left: -8px;
+		padding: 4px 10px 4px 8px;
+		border-radius: 10px;
+		font-size: 17px;
 		font-weight: 700;
 	}
 	.title:hover {
@@ -341,7 +346,7 @@
 	}
 	.dropdown {
 		position: absolute;
-		top: 34px;
+		top: calc(100% + 4px);
 		left: 0;
 		min-width: 230px;
 		padding: 5px;

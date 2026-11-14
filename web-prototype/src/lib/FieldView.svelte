@@ -141,6 +141,16 @@
 				<span style:background={hex(backdropHex(game.away.team))}></span>
 				<span style:flex="10" style:background="#40983c"></span>
 				<span style:background={hex(backdropHex(game.home.team))}></span>
+				{#if game.status === 'live' && offense}
+					<!-- The possession tint carries on down the edge, so the field reads as one raised block. -->
+					{@const end = homeOffense ? 0 : width}
+					<i
+						class="edge-tint"
+						style:left="{Math.min(ballX, end)}px"
+						style:width="{Math.abs(end - ballX)}px"
+						style:background="linear-gradient(to {homeOffense ? 'right' : 'left'}, color-mix(in srgb, {offenseColor} 55%, transparent), color-mix(in srgb, {offenseColor} 5%, transparent))"
+					></i>
+				{/if}
 			</div>
 		</div>
 		<!-- Goalposts stand upright, outside the tilt, just behind each end line. -->
@@ -278,9 +288,15 @@
 		left: 6px;
 	}
 	.edge {
+		position: relative;
 		display: flex;
 		height: 7px;
 		filter: brightness(0.75);
+	}
+	.edge-tint {
+		position: absolute;
+		top: 0;
+		bottom: 0;
 	}
 	.edge span {
 		flex: 1;

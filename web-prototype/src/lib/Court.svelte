@@ -103,6 +103,8 @@
 				<polygon points="14,46 19,48 19,96 14,98" fill="color-mix(in srgb, {pad}, black 35%)" />
 				<polygon points="2,50 14,46 19,48 7,52" fill="color-mix(in srgb, {pad}, white 30%)" />
 				<path d="M2,72 L14,70" stroke="rgba(0,0,0,0.18)" stroke-width="0.8" />
+				<!-- A thin white edge, so a dark team colour doesn't vanish into a dark backdrop. Under the arm, which sits in front. -->
+				<polygon points="2,50 14,46 19,48 19,96 14,98 2,98" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="1.1" stroke-linejoin="round" />
 				<polygon points="9,47 31,39 31,42 9,50" fill="#e0e0e0" />
 				<polygon points="9,50 31,42 31,43.5 9,51.5" fill="#9e9e9e" />
 				<path d="M17,60 L30,44" stroke="#b3b3b3" stroke-width="1.5" />
