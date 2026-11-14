@@ -1,17 +1,5 @@
 # macOS
 .DS_Store
 
-# Xcode
-DerivedData/
-build/
-xcuserdata/
-*.xcuserstate
-*.xcscmblueprint
-
-# Swift Package Manager
-.build/
-.swiftpm/
-Package.resolved
-
 # Local notes and scratch
 *.log

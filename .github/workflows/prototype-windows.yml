@@ -5,7 +5,7 @@ name: Prototype Windows build
 on:
   workflow_dispatch:
   push:
-    branches: [web-prototype]
+    branches: [main, web-prototype]
     paths: ['web-prototype/**', '.github/workflows/prototype-windows.yml']
 
 jobs:

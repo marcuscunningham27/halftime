@@ -1,172 +1,89 @@
 # Halftime (sports app): handoff
 
-Native macOS sports app called **Halftime** (SwiftUI, macOS 26, Swift 6, Liquid Glass), modelled on Apple's iOS Sports app and ESPN.
-The original brief is `Mac Sports App — Claude Code Spec.md`. Last updated 21 October 2026.
+A sports scores app for Mac, Windows and the web, built with **Tauri v2** (Rust) and **SvelteKit** (Svelte 5, a
+static single-page app). It lives in `web-prototype/` (the folder name is historical). Last updated 14 November 2026.
+
+The app started as a native SwiftUI Mac app. That version was retired on 14 November 2026 once this one matched it;
+its full source is on the **`swift` branch** (`git checkout swift`), and it's no longer built or installed.
+Widgets and Apple's on-device model were dropped on purpose with it.
 
 ## Goal
 
-A menu-bar-plus-window sports app with live scores, smart notifications, rich game pages, a Fantasy section
-(Sleeper and ESPN Fantasy) and optional AI features (Apple's on-device model or Claude). The user works in
-small rounds: they send screenshots and requests, and each change is built, checked in the running app,
-then reported back.
+A menu-bar-plus-window sports app with live scores, smart alerts, rich game pages, Fantasy (Sleeper and ESPN
+Fantasy) and optional Claude features. The user works in small rounds: screenshots and requests, each change built,
+checked in the running app, then reported back. Commit and push only when the user asks.
 
-## Current progress
+## What it does
 
-All 8 phases of the spec are done, plus a lot of extra design work.
+- **Scores:** ESPN's unofficial site API for NFL, college football (AP Top 25 standings), NBA, WNBA, men's college
+  basketball (all of Division I via `groups=50`, AP poll standings, every D-I team searchable), MLB, NHL, EPL,
+  Champions League and MLS. Home (Yesterday / Today / Upcoming, My Teams first), league and team pages with a date
+  field, recent results and standings. Score cards show where to watch.
+- **Menu bar / tray:** the pinned live score as the menu-bar title (the pitch icon hides while a score shows), a
+  glass panel window (`routes/tray`) with today's games, Close to Menu, launch at login.
+- **Following and alerts:** follow teams and leagues; alerts for game start, scores, period end, halftime, final,
+  red zone, close game, overtime and lead changes. Each followed league or team can have its own alert settings
+  (team over league over global), teams can be muted, quiet hours hold alerts (saved, so a restart keeps them).
+- **Game page:** a surface per sport (NFL field, basketball court with shot chart, rink, diamond, pitch) inside a
+  Gamecast with the last play, timeouts and fouls; line score; Overview, Stats, Play-By-Play and Box Score tabs;
+  win and cover probability charts; a recap card (ESPN's story or facts, optionally rewritten by Claude) and
+  Ask About the Game.
+- **Fantasy:** Sleeper (by username) and ESPN Fantasy (league ID, plus `espn_s2` / `SWID` cookies for private
+  leagues, sent from Rust). Lineup with matchup and a Claude week briefing, Past Games, Upcoming, Season, News with
+  bye-week cover. Your players get a yellow jersey badge on NFL score cards and in game pages.
+- **Claude:** `claude-haiku-5-5` via the Anthropic SDK with the user's own key (Keychain / Credential Manager):
+  recaps, catch-ups, Ask, the fantasy briefing.
+- **App icon:** A1 (green pitch markings) in a black and a white version, picked in Settings › General.
 
-- **Scores:** ESPN's unofficial site API covers NFL, college football (AP Top 25 only: its Standings tab is the poll, so search offers only ranked teams), NBA, WNBA, MLB, NHL, EPL, Champions League and MLS (soccer leagues share the EPL code; WNBA reuses all the NBA code; AFL and NRL were dropped in Oct 2026: ESPN's data for them was too thin). There's a Home tab
-  (Yesterday/Today/Upcoming, My Teams first), and league and team pages with the same picker, recent
-  results and standings.
-- **Where to watch:** score cards (Home, league pages) show a glass pill under the status with up to two
-  channels/apps for live and upcoming games (`Game.broadcasts`, from the scoreboard's `geoBroadcasts`,
-  national first, falling back to `broadcasts`). Hover shows the full list.
-- **Menu bar:** a live score label, a popover, 15-second polling, a Close to Menu setting and launch at login.
-- **Following:** follow teams and leagues (SwiftData). The sidebar has a search field under Home and a
-  hairline between followed leagues and teams.
-- **Notifications:** an event detector, preferences that resolve team over league over global, quiet hours,
-  and red zone alerts. An optional "Describe scoring plays in alerts" setting writes a one-line play
-  description with the on-device model only (never Claude). It retries ESPN's play-by-play for about
-  25 seconds, matching the play by score.
-- **Game page:**
-  - A playing surface for each sport:
-    - NFL field in ESPN style, with Down / Ball On / Drive header, goalposts, end zones, the drive, and the last play.
-    - Gamecast (`DesignSystem/Gamecast.swift`, NBA, NFL, NHL and MLB): `GamecastView` wraps the surface with a last
-      play banner (Timeout / End of 1st / End of Game too), timeouts (and NBA fouls/bonus), and the 3 latest
-      plays. NFL: home logo at midfield, ball slides and pulses; NFL timeouts are filed under the drive's
-      team by ESPN, so the caller is read from "Timeout #1 by SF". NBA: last play banner over the court, the home logo at centre court,
-      the team in possession's half shaded with moving chevrons, a pulse on the latest shot, timeouts left
-      (pips), team fouls and BONUS, then the 3 latest plays. The line score sits between the teams under the
-      clock (all four). NHL: home logo at centre ice, pulse on the latest shot, POWER PLAY · team and
-      EMPTY NET pills (core API `powerPlay`/`emptyNet`; the team is the one the latest "X against Y" penalty
-      wasn't filed under). MLB: the banner follows every pitch; the list shows "Play Result" at-bats, whose
-      headline ("Single", "Fly Out") is copied from the pitch put in play when parsing. The diamond's arc
-      is the latest at-bat only (none after a strikeout or walk); ESPN puts the hit spot on either the
-      result row or the "Ball In Play" pitch, so `atBats` checks both. The header line score is `compact`. Possession is inferred from plays (`CourtSituation.possession`); timeouts and
-      fouls come from ESPN's core API `.../competitions/{id}/situation`, fetched only while live.
-    - MLB diamond, NHL rink and soccer pitch.
-  - A line score, then Overview, Stats, Play-By-Play and Box Score tabs.
-  - Win and cover probability charts with hover values.
-  - Recap / Catch Me Up card with no AI needed: finished games show ESPN's written story
-    (`GameOverview.recap`, parsed from the summary's `article`); live games, and finals without a story, show
-    `GameFacts.summary` (score, top performers, NBA runs or the latest score, NFL/MLB situation, deciding
-    period). "Summarise with Claude/AI" rewrites it with the chosen engine when that engine can run.
-  - Ask About the Game: four one-click `QuickQuestion`s per league (SportsKit), answered from the stats by
-    `GameFacts.answer` (leaders, team stats, scoring plays, runs, drives, box rows); `.model` questions and typed
-    questions go to the AI engine, except typed questions `GameFacts.answer(typed:)` can answer from the stats:
-    a named player ("how many rebounds does Booker have?", matched on surname, reads their box score row) or a
-    leader category ("most points"). The on-device model gets `compact` prompts (latest 10
-    scoring plays) because a full NBA game overflowed its ~4,000-token context; it still invents players now and then. The typed box only shows when an engine is available. The user found the
-    on-device model too error-prone for free-written summaries, hence this.
-- **Widgets:** My Teams (each team's live game, else a result from the last 36 h, else its next game;
-  rows ordered live, results, upcoming) and League, with an App Group for shared data and Chakra Petch scores.
-- **AI** (Settings › Summaries): pick On-Device (Apple Foundation Models, the default) or Claude
-  (`claude-haiku-5-5`, key stored in the Keychain).
-- **Fantasy** (sidebar under Home): saved leagues in Settings › Fantasy (Sleeper by username, ESPN by league
-  ID plus optional espn_s2 and SWID cookies). The toolbar's league dropdown switches between them. Five tabs:
-  - **Lineup:**
-    - A matchup card: actual points in big type, PROJ beneath, and a win chance bar.
-    - A Week Briefing (AI, only when the user clicks "Brief Me"), then linked news stories.
-    - Starters and bench with status, bye week, news, and Proj and last-week columns.
-  - **Past Games:** a week picker (latest played week first, often the current one), games, and your players' ESPN stat lines and points.
-  - **Upcoming:** next week's games, with dates.
-  - **Season:** trend tiles, a projected-vs-actual chart with hover, gaps by position and by starter, and
-    standings (your row is a green glass capsule).
-  - **News:**
-    - A roster summary.
-    - A Bye Weeks card with traffic lights (Clear, Covered, Hole) and Who's Missing and Covered By columns.
-    - An injury report and the latest news (ESPN/Rotowire, clickable).
+## Layout and key files (`web-prototype/`)
 
-Tests: 132 passing in SportsKit.
+- `src/lib/espn.ts`: leagues, scoreboard / summary / standings parsing, display helpers, `gameLink`.
+- `src/lib/live.ts`: the app-wide poller (15 s while live), alerts, held quiet-hours alerts, the tray.
+- `src/lib/alerts.ts`: event detection, alert rules (`resolvedAlert`), quiet hours, menu-bar text. Pure, tested.
+- `src/lib/fantasy.ts`: Sleeper and ESPN Fantasy, season trends, bye-week cover. `roster.svelte.ts` loads your
+  players for badges.
+- `src/lib/claude.ts`: prompts and the Messages API call. `facts.ts`: answers from the stats without AI.
+- `src/lib/follows.svelte.ts`, `settings.svelte.ts`: state saved in localStorage. `secrets.ts`: Keychain via Rust.
+- `src/routes/`: Home (`+page`), `league`, `game`, `fantasy`, `settings`, `tray` (the menu-bar panel window).
+- `src-tauri/src/lib.rs`: Rust commands for secrets, the Dock icon (`set_dock_visible`) and the app icon
+  (`set_app_icon`: the Dock image on macOS, the window icon on Windows).
+- `src-tauri/icons/`: `Halftime.icon` (Icon Composer source, light and dark) compiled by `mac-icon.sh` into
+  `Assets.car`; `app-light.png` / `app-dark.png` for the icon picker; the rest generated by `npx tauri icon`.
+- Tests: `src/lib/*.test.ts` (Node's test runner).
 
-## Name and icon
+## Build, run, install
 
-- Shown everywhere as **Halftime** (display name, `PRODUCT_NAME = Halftime`, so the built app is `Halftime.app`).
-  The bundle IDs (`com.marcuscunningham.SportsApp`, `.Widgets`), App Group, Keychain services, Xcode target,
-  scheme and Swift module (`PRODUCT_MODULE_NAME = SportsApp`) keep the old name on purpose, so saved settings,
-  follows and fantasy leagues carry over.
-- Icon (`SportsApp/AppIcon.icon`): a halfway line, centre circle and spot in white over a green left half and
-  blue right half (`background.png`, glass translucency off so the colours stay rich). The layers are drawn
-  by a small CoreGraphics script; macOS caches icons, so an old icon can linger in the Dock until it restarts.
-- Home's toolbar shows a "Halftime" wordmark with `HalftimeMark` (the icon's markings on a clear glass tile,
-  in `HomeView.swift`) instead of the plain "Home" title.
+- Dev: `cd web-prototype && CARGO_TARGET_DIR="$HOME/Library/Caches/halftime-prototype-target" npm run tauri dev`.
+  Browser only: `npm run dev` (port 1420; `.claude/launch.json` has it as `halftime-web`).
+- Checks: `npm run check` and `npm test`.
+- Mac release: `npm run tauri build -- --bundles app` (same `CARGO_TARGET_DIR`), then copy
+  `~/Library/Caches/halftime-prototype-target/release/bundle/macos/Halftime.app` to `/Applications` (quit it first).
+  The bundle ID is `com.halftime.prototype`; keep it, or saved follows and Keychain secrets won't carry over.
+- Windows: GitHub Actions (`.github/workflows/prototype-windows.yml`) builds an unsigned NSIS installer on every
+  push to `main` or `web-prototype` that touches `web-prototype/`; download it from the run's Artifacts
+  (SmartScreen: More info › Run anyway).
 
-## Layout and key files
+## Gotchas
 
-- `SportsKit/` (local Swift package): models, providers and logic. Logic is kept here so it can be unit-tested.
-  - `Providers/ESPN/ESPNProvider.swift` and `ESPNEndpoints.swift` hold every ESPN path, `nflWeek` (one week
-    in one request) and `nflByes`.
-  - `Providers/Sleeper.swift`: users, leagues, rosters, lineup slots, players (cached on disk for 3 hours as
-    `sleeper-players-v3.json`), projections scored with the league's own `scoring_settings` (matches Sleeper
-    exactly), matchups, standings and the calendar.
-  - `Fantasy/Fantasy.swift`: the shared `FantasyPlayer`, `FantasyTeam`, `FantasyMatchup` (including
-    `winProbability`) and `FantasyLeagueRef` types, and `FantasyData`, which dispatches to each provider.
-  - `Fantasy/ESPNFantasy.swift`: the ESPN Fantasy league API.
-  - `Fantasy/FantasyInsights.swift`: `SeasonTrend`, `FantasyStanding`, `ByeWeekPlanner` and `LineupCover`
-    (who fills each slot, using a matching algorithm), `ESPNNews` (news feed and roster ID lookup), and
-    `FantasyPrompt` (the weekly briefing prompt).
-  - `Claude/ClaudeService.swift`: raw-HTTP Messages API calls, `GamePrompt` (recap, catch-up, play line, ask).
-  - `Engine/Probability.swift`: chart maths.
-- `SportsApp/`:
-  - `App/ContentView.swift`: the sidebar, search, and `popToRoot`. Clicking a row again sends its page back
-    to the top; Fantasy also returns to Lineup.
-  - `DesignSystem/`: `ScoreStyle` (score font, ScoreCard, SportsCard, Backdrop with `.backdrop(color)`),
-    `GlassPicker`, `PlaySurfaces`, `FieldView`, `UnitSystem`.
-  - `Features/Fantasy/`: `FantasyView`, `FantasySeasonView`, `FantasyNewsView`, `WeekOverviewCard`,
-    `FantasyStore` (saved leagues, plus ESPN cookies in the Keychain), `FantasySettings`.
-  - `Features/Claude/`: `RecapEngine` (picks on-device or Claude), `ClaudeKey` (Keychain), `RecapCard`, `AskCard`.
-  - `Features/Notifications/`: `NotificationService` and `SettingsView` (General, Notifications, Following,
-    Fantasy and Summaries tabs).
-- `SportsWidgets/SportsWidgets.swift`.
+- `~/Documents` syncs to iCloud, which can bring deleted files back (`+page 2.svelte`, an old `project.pbxproj`).
+  Check with `find . -name "* 2*" -not -path "*/node_modules/*"` after deleting things.
+- Keep `CARGO_TARGET_DIR` outside `~/Documents`, or iCloud churns through the Rust build.
+- Tauri permissions: anything a page asks of the window needs a line in `src-tauri/capabilities/default.json`
+  (dragging the window by its top bar needed `core:window:allow-start-dragging`).
+- The dev app and the installed app keep separate localStorage (different origins), so follows set up in one
+  don't appear in the other. Keychain secrets are shared.
+- The user is in Brisbane: US Sunday NFL games fall on Monday locally. That's correct, not a bug.
+- macOS 26 has no "icons follow dark mode" setting (its icon style is Default / Dark / Clear / Tinted), hence the
+  in-app picker. Finder shows the white icon unless the system icon style is Dark.
+- `claude-haiku-5-5` thinks by default and its thinking counts against `max_tokens`: keep 4000 with low effort.
+- ESPN NBA clocks drop to plain seconds ("45.3") in a period's last minute; parsers accept both formats.
 
-## Build and run
+## Open items
 
-- `xcodebuild -project SportsApp.xcodeproj -scheme SportsApp -configuration Debug -allowProvisioningUpdates build`,
-  then open `~/Library/Developer/Xcode/DerivedData/SportsApp-blqwxhtuufmkyjhcpilwreraremh/Build/Products/Debug/Halftime.app`.
-  Run `pkill -x Halftime` first, or `open` just brings the old build forward.
-- Run tests outside ~/Documents (codesign fails on extended attributes):
-  `cd SportsKit && swift test --scratch-path <scratchpad>/skbuild`.
-- Widgets: bump `CURRENT_PROJECT_VERSION` (currently 48) and run `lsregister -f` on the app whenever widget
-  code **or SportsKit** changes (the widget links SportsKit). Otherwise widgets draw grey placeholders and
-  chronod logs "Bundle version did not match". `killall chronod` makes them reload straight away.
-- The user checks things visually. Check changes in the running app (the computer-use tools work; macOS
-  won't open pop-up menus in the background, and nothing can be clicked while the screen is locked).
-
-## What worked
-
-- Keeping all parsing and logic in SportsKit with small fixture or inline-JSON tests, and only UI in the app.
-- ESPN team rosters, matched by name within the player's own team, cover players Sleeper has no ESPN ID for.
-  Sleeper's photo CDN (`sleepercdn.com/content/nfl/players/thumb/{id}.jpg`) covers every player.
-- ESPN's fantasy news feed: `site.api.espn.com/apis/fantasy/v2/games/ffl/news/players?playerId=` (Rotowire,
-  with links).
-- Precomputing facts for the AI (lineup issues, eligible bench cover) instead of asking the small on-device
-  model to reason them out. It got them wrong otherwise.
-- Separating a sidebar section with a line drawn from the List via `anchorPreference`. Rows clip their own
-  overlays, and macOS keeps rows a fixed height.
-
-## What didn't work
-
-- `toolbarTitleMenu` inside a split-view NavigationStack shows no menu. The Fantasy league dropdown uses a
-  `ToolbarItem(.navigation)` Menu instead, with the title removed.
-- `contentMargins` doesn't apply to the sidebar List; padding does.
-- Divider rows and section headers as separators in the sidebar (they leave big gaps or get covered by the
-  selection highlight).
-- `claude-haiku-5-5` with `max_tokens: 400` returned empty answers, because thinking is on by default and
-  counts against the cap. The fix is `max_tokens: 4000` plus `output_config.effort: "low"`, and handling a
-  `max_tokens` or `refusal` stop reason.
-- ESPN NBA clocks drop to plain seconds ("45.3") in a period's last minute, which broke the probability
-  chart. Both formats are now parsed.
-- Yahoo Fantasy can't be done without a registered Yahoo developer app (OAuth). It's shown as unavailable.
-
-## Next steps / open items
-
-- ESPN Fantasy is tested against sample JSON only. It needs a real league to confirm parsing and lineup
-  slots.
-- Rich score alerts haven't been seen on a live score since the retry fix.
-- The widget three-digit score fix hasn't been checked on the desktop.
-- Possible extras the user mentioned or that came up: weather in lineup notes, injury return dates from
-  news instead of status-based guesses (Out = 1 week, IR = 4), and a win chance that moves with live points.
-- NBA and NFL Gamecasts checked live by the user (22 Oct 2026). NHL and MLB were built on finished
-  games only; the power play pill and the pitch-by-pitch banner still need a live look.
-- Fantasy stars (NFL games only): `FantasyStore.loadRoster()` loads every saved league's team (cached 10 min);
-  `FantasyRoster` (SportsKit) matches play text by full or ESPN short name ("J.Daniels") and box rows by ESPN
-  ID or name. Starred + yellow tint in the game cast, Play-by-Play and Box Score.
+- Not yet seen on a real device or live game: the Windows build at runtime (planned for 15 November), ESPN
+  Fantasy against a real league (only public league IDs or sample JSON so far), per-team alerts on a live game,
+  saved quiet-hours alerts through a restart, the college basketball Gamecast at the end of a close game.
+- Ideas the user raised, not started: Claude with tools (one "Ask Halftime" box over scores, standings, rosters,
+  news and odds, plus a morning catch-up), maybe an MCP server so Claude Desktop can read Halftime's data;
+  betting features (odds on score cards, live covering tags, line movement, a personal bet tracker).
+- Maybe: move `web-prototype/` to the repo root now that it's the only app (touches build paths and the workflow).

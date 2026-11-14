@@ -1,7 +1,7 @@
-# Halftime (web prototype)
+# Halftime
 
-A Tauri + SvelteKit version of the Halftime sports app, kept at the same features as the Swift app in the
-repository root, to run on Mac, Windows and the web.
+A sports scores app for Mac, Windows and the web: Tauri (Rust) around a SvelteKit page. See `../HANDOFF.md` for
+what it does, how it's laid out and what's open.
 
 - Run the desktop app: `CARGO_TARGET_DIR="$HOME/Library/Caches/halftime-prototype-target" npm run tauri dev`
   (the cache path keeps Rust's build output out of iCloud).
