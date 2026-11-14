@@ -3,3 +3,7 @@
 
 # Local notes and scratch
 *.log
+
+# iCloud's duplicate copies of files in ~/Documents ("icon 2.png", "Halftime 2.icon/")
+* [0-9].*
+* [0-9]
