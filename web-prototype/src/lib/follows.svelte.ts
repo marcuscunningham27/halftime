@@ -31,6 +31,11 @@ export const teamKey = (leagueID: string, teamID: string) => `${leagueID}:${team
 export const followedKeys = () => new Set(follows.teams.map((t) => teamKey(t.leagueID, t.team.id)));
 
 export const isFollowingLeague = (leagueID: string) => follows.leagues.includes(leagueID);
+
+/** In the sidebar and on Home: picked on the welcome screen (all, before a choice is made), or followed, or home to a
+ *  followed team, so nothing you follow disappears. Search still reaches every league. */
+export const isShownLeague = (leagueID: string) =>
+	settings.shownLeagues === null || settings.shownLeagues.includes(leagueID) || isFollowingLeague(leagueID) || follows.teams.some((t) => t.leagueID === leagueID);
 export const isFollowingTeam = (leagueID: string, teamID: string) => follows.teams.some((t) => t.leagueID === leagueID && t.team.id === teamID);
 
 export function toggleLeague(leagueID: string) {

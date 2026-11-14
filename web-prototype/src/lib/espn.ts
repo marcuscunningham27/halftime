@@ -51,7 +51,7 @@ const soccerLogoIDs: Record<string, number> = { epl: 23, ucl: 2, mls: 19 };
 export const leagueLogo = (l: League) =>
 	l.id === 'cfb' ? 'https://a.espncdn.com/redesign/assets/img/icons/NCAASports_Football.png'
 	: l.id === 'ncaab' ? 'https://a.espncdn.com/redesign/assets/img/icons/NCAASports_MensBasketball.png'
-	: soccerLogoIDs[l.id] ? `https://a.espncdn.com/i/leaguelogos/soccer/500/${soccerLogoIDs[l.id]}.png`
+	: soccerLogoIDs[l.id] ? `https://a.espncdn.com/i/leaguelogos/soccer/500-dark/${soccerLogoIDs[l.id]}.png`
 	: `https://a.espncdn.com/i/teamlogos/leagues/500/${l.id}.png`;
 
 export type Team = { id: string; abbreviation: string; displayName: string; shortName: string; color?: string; alternateColor?: string; logo?: string };

@@ -6,6 +6,7 @@
 	import GlassPicker from '$lib/GlassPicker.svelte';
 	import FollowButton from '$lib/FollowButton.svelte';
 	import LeagueSetup from '$lib/LeagueSetup.svelte';
+	import LeagueBubbles from '$lib/LeagueBubbles.svelte';
 	import { leagues, leagueLogo } from '$lib/espn';
 	import { follows } from '$lib/follows.svelte';
 	import { store } from '$lib/fantasy';
@@ -101,6 +102,14 @@
 	{/if}
 
 	{#if tab === 'General'}
+		<section class="sports-card">
+			<h2>Leagues</h2>
+			<!-- The welcome screen's picker; at least one stays picked. Followed leagues and teams always show. -->
+			<div class="league-picker">
+				<LeagueBubbles compact selected={settings.shownLeagues ?? leagues.map((l) => l.id)} onchange={(ids) => ids.length && ((settings.shownLeagues = ids), saveSettings())} />
+			</div>
+			<p class="footnote">The leagues in your sidebar and on Home. Anything you follow shows too.</p>
+		</section>
 		<section class="sports-card">
 			{@render toggle('Launch at login', launchAtLogin, setLaunchAtLogin, !inTauri)}
 			<p class="footnote">Alerts only arrive while Halftime is running, so it stays in the menu bar.</p>
@@ -369,6 +378,9 @@
 	}
 	.error {
 		color: #ff6961;
+	}
+	.league-picker {
+		padding: 10px 0 4px;
 	}
 	.icons {
 		display: flex;

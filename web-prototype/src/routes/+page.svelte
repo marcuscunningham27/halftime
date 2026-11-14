@@ -4,11 +4,11 @@
 	import GlassPicker from '$lib/GlassPicker.svelte';
 	import ScoreCard from '$lib/ScoreCard.svelte';
 	import { leagues as allLeagues, gameLink, leagueLogo, scoreboard, startOfDay, ordered, orderLeagues, type Game } from '$lib/espn';
-	import { isFollowingTeam } from '$lib/follows.svelte';
+	import { isFollowingTeam, isShownLeague } from '$lib/follows.svelte';
 	import { settings } from '$lib/settings.svelte';
 
 	// Sections in the order dragged into in the sidebar.
-	const leagues = $derived(orderLeagues(allLeagues, settings.leagueOrder));
+	const leagues = $derived(orderLeagues(allLeagues, settings.leagueOrder).filter((l) => isShownLeague(l.id)));
 	const days = ['Yesterday', 'Today', 'Upcoming'] as const;
 	let day = $state<(typeof days)[number]>('Today');
 	let games = $state<Game[] | undefined>();
@@ -21,7 +21,8 @@
 	async function refresh(forOffset = offset) {
 		try {
 			// The fixed list: fetching doesn't care about order, and reading the ordered one would refetch on every reorder.
-			const results = await Promise.all(allLeagues.map((l) => scoreboard(l, startOfDay(forOffset)).catch(() => undefined)));
+			// Only the leagues on show (read before the first await, so picking leagues refetches).
+			const results = await Promise.all(allLeagues.filter((l) => isShownLeague(l.id)).map((l) => scoreboard(l, startOfDay(forOffset)).catch(() => undefined)));
 			if (forOffset !== offset) return;
 			// One league failing (an endpoint change, say) shouldn't blank the others; only every league failing is an
 			// error, as in ScoreboardPoller. Games already shown stay up meanwhile.

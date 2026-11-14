@@ -15,6 +15,8 @@ type Saved = {
 	appIcon: 'dark' | 'light';
 	/** For weather at the venue; starts from the system's region. */
 	units: 'metric' | 'imperial';
+	/** Leagues picked on the welcome screen (or in Settings) for the sidebar and Home; null until the first choice. */
+	shownLeagues: string[] | null;
 	/** League IDs in the order dragged into in the sidebar, which Home's sections follow; empty = the usual order. */
 	leagueOrder: string[];
 };
@@ -27,6 +29,7 @@ const defaults = (): Saved => ({
 	appIcon: 'dark',
 	muted: [],
 	units: typeof navigator !== 'undefined' && /-(US|LR|MM)$/.test(navigator.language) ? 'imperial' : 'metric',
+	shownLeagues: null,
 	leagueOrder: []
 });
 

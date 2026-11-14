@@ -5,8 +5,9 @@
 	import { inTauri as isTauri } from '$lib/platform';
 	import { leagues, leagueLogo, allTeams, orderLeagues, moveLeague, type League, type Team } from '$lib/espn';
 	import { settings, saveSettings } from '$lib/settings.svelte';
-	import { follows } from '$lib/follows.svelte';
+	import { follows, isShownLeague } from '$lib/follows.svelte';
 	import FollowButton from '$lib/FollowButton.svelte';
+	import Welcome from '$lib/Welcome.svelte';
 	import { startLive, refreshLive } from '$lib/live';
 	let { children } = $props();
 	// In the Tauri window the title bar is transparent, so the sidebar leaves room for the traffic lights.
@@ -46,7 +47,7 @@
 		if (inTauri && !isPanel) refreshLive();
 	});
 	// Leagues in the order dragged into below; Home lists its sections the same way.
-	const ordered = $derived(orderLeagues(leagues, settings.leagueOrder));
+	const ordered = $derived(orderLeagues(leagues, settings.leagueOrder).filter((l) => isShownLeague(l.id)));
 	let dragging = $state<string | undefined>();
 	let dropBefore = $state<string | null | undefined>(); // a league ID, null for the end, undefined when not over the list
 	function reorder(id: string, before: string | undefined) {
@@ -80,6 +81,8 @@
 {#if isPanel}
 	{@render children()}
 {:else}
+<!-- First launch: pick leagues before anything else. -->
+{#if settings.shownLeagues === null}<Welcome />{/if}
 <div class="app" class:tauri={inTauri}>
 	<!-- The macOS 26 sidebar: a floating glass panel inset from the window edge, over the page's colour. -->
 	<nav class="sidebar glass" data-tauri-drag-region>
@@ -152,7 +155,7 @@
 							}}
 							ondragend={() => ([dragging, dropBefore] = [undefined, undefined])}
 							onkeydown={(e) => keyMove(e, i)}
-						><img src={leagueLogo(l)} alt="" width="16" height="16" draggable="false" />{l.abbreviation}</a>
+						><img src={leagueLogo(l)} alt="" width="16" height="16" draggable="false" />{l.abbreviation}<svg class="grip" viewBox="0 0 12 10" width="12" height="10" aria-hidden="true"><path d="M1 1.5h10M1 5h10M1 8.5h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" /></svg></a>
 					{/each}
 					{#if dragging && dropBefore === null}<span class="drop-end"></span>{/if}
 				</div>
@@ -353,6 +356,22 @@
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
+	}
+	/* A drag handle that fades in after the pointer rests on a row for a moment, and goes at once when it leaves. */
+	.grip {
+		margin-left: auto;
+		flex: none;
+		color: var(--secondary);
+		opacity: 0;
+		transition: opacity 0.2s;
+	}
+	.league-row:hover .grip,
+	.league-row:focus-visible .grip {
+		opacity: 0.7;
+		transition: opacity 0.25s 0.6s;
+	}
+	.league-row.dragging .grip {
+		opacity: 0;
 	}
 	.league-row.dragging {
 		opacity: 0.4;
