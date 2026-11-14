@@ -7,7 +7,7 @@
 	import ScoreCard from '$lib/ScoreCard.svelte';
 	import FollowButton from '$lib/FollowButton.svelte';
 	import { isFollowingTeam } from '$lib/follows.svelte';
-	import { gameLink, leagueByID, leagueLogo, scoreboard, recentResults, upcoming, standings as loadStandings, startOfDay, type Game, type Standings } from '$lib/espn';
+	import { gameLink, leagueByID, leagueLogo, scoreboard, recentResults, upcoming, standings as loadStandings, allTeams, startOfDay, type Game, type Standings, type Team } from '$lib/espn';
 
 	const league = $derived(leagueByID(page.url.searchParams.get('league')));
 	const teamID = $derived(page.url.searchParams.get('team'));
@@ -27,10 +27,16 @@
 	let table = $state<Standings | undefined>();
 	let error = $state<string | undefined>();
 
+	// Every team, so an unranked college team on a day off still has a name and a star.
+	let everyTeam = $state<{ league: { id: string }; team: Team }[]>([]);
+	$effect(() => {
+		if (teamID) allTeams().then((t) => (everyTeam = t));
+	});
 	const involvesTeam = (g: Game) => !teamID || g.home.team.id === teamID || g.away.team.id === teamID;
 	const team = $derived(
 		[...(games ?? []), ...recent, ...(ahead ?? [])].flatMap((g) => [g.home.team, g.away.team]).find((t) => t.id === teamID) ??
-			table?.groups.flatMap((g) => g.entries).find((e) => e.team.id === teamID)?.team
+			table?.groups.flatMap((g) => g.entries).find((e) => e.team.id === teamID)?.team ??
+			everyTeam.find((t) => t.league.id === league.id && t.team.id === teamID)?.team
 	);
 	const title = $derived(teamID ? (team?.displayName ?? '') : league.abbreviation);
 

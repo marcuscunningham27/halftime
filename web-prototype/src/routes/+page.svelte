@@ -17,6 +17,9 @@
 	/** Followed teams' games come first under My Teams, and aren't repeated in their league. */
 	const mine = $derived(ordered((games ?? []).filter((g) => isFollowingTeam(g.league.id, g.home.team.id) || isFollowingTeam(g.league.id, g.away.team.id))));
 	const mineIDs = $derived(new Set(mine.map((g) => g.id)));
+	/** A league's section: college shows Top 25 games only (the league's own page has every game). */
+	const sectionGames = (id: string) =>
+		ordered((games ?? []).filter((g) => g.league.id === id && !mineIDs.has(g.id) && ((id !== 'cfb' && id !== 'ncaab') || g.home.rank || g.away.rank)));
 
 	async function refresh(forOffset = offset) {
 		try {
@@ -80,9 +83,9 @@
 				{/each}
 			{/if}
 			{#each leagues as league, i}
-				{@const leagueGames = ordered(games.filter((g) => g.league.id === league.id && !mineIDs.has(g.id)))}
+				{@const leagueGames = sectionGames(league.id)}
 				{#if leagueGames.length}
-					{#if mine.length || (i > 0 && games.some((g) => leagues.indexOf(g.league) < i && !mineIDs.has(g.id)))}<hr class="section" />{/if}
+					{#if mine.length || leagues.slice(0, i).some((l) => sectionGames(l.id).length)}<hr class="section" />{/if}
 					<h2><a href="/league?league={league.id}"><img src={leagueLogo(league)} alt="" width="20" height="20" />{league.abbreviation}<svg class="chevron" viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" /></svg></a></h2>
 					{#each leagueGames as game, j (game.id)}
 						{#if j > 0}<hr />{/if}

@@ -17,7 +17,7 @@ export type League = {
 /** Every league, in sidebar order (League.all). */
 export const leagues: League[] = [
 	{ id: 'nfl', name: 'National Football League', abbreviation: 'NFL', path: 'football/nfl', sport: 'football', regulationPeriods: 4, periodStyle: 'quarters' },
-	// AP Top 25 only: ESPN's default scoreboard is ranked teams' games, and search offers the poll's teams.
+	// ESPN's default scoreboard is every FBS game; search offers every FBS team.
 	{ id: 'cfb', name: 'College Football', abbreviation: 'NCAAF', path: 'football/college-football', sport: 'football', regulationPeriods: 4, periodStyle: 'quarters' },
 	{ id: 'nba', name: 'National Basketball Association', abbreviation: 'NBA', path: 'basketball/nba', sport: 'basketball', regulationPeriods: 4, periodStyle: 'quarters' },
 	{ id: 'wnba', name: "Women's National Basketball Association", abbreviation: 'WNBA', path: 'basketball/wnba', sport: 'basketball', regulationPeriods: 4, periodStyle: 'quarters' },
@@ -747,16 +747,18 @@ export async function upcoming(league: League, days: number): Promise<Game[]> {
 	return pages.flat().filter((g) => g.status === 'scheduled' && !seen.has(g.id) && seen.add(g.id)).sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
 }
 
-/** Every Division I team, so any team can be found and followed come March, not only the ranked ones. */
+/** Every Division I basketball team or FBS football team, so any team can be found and followed, not only the ranked ones. */
 async function collegeTeams(l: League): Promise<{ league: League; team: Team }[]> {
-	const d = await getJSON(`${base}${l.path}/teams?groups=50&limit=500`);
-	return (d.sports?.[0]?.leagues?.[0]?.teams ?? []).map((t: any) => ({ league: l, team: parseTeam(t.team) }));
+	// Standings, not /teams: ESPN's /teams sends no CORS header, so the app's webview can't read it.
+	const root = await getJSON(`https://site.api.espn.com/apis/v2/sports/${l.path}/standings?groups=${l.id === 'cfb' ? 80 : 50}`);
+	const teams = (node: any): any[] => [...(node.standings?.entries ?? []).map((e: any) => e.team), ...(node.children ?? []).flatMap(teams)];
+	return teams(root).map((t) => ({ league: l, team: parseTeam(t) }));
 }
 
-/** Every team, from each league's standings (college basketball: all of Division I), for search; loaded once, the first time someone searches. */
+/** Every team, from each league's standings (college: every Division I basketball or FBS football team), for search; loaded once, the first time someone searches. */
 let teamsPromise: Promise<{ league: League; team: Team }[]> | undefined;
 export function allTeams() {
-	teamsPromise ??= Promise.all(leagues.map((l) => (l.id === 'ncaab' ? collegeTeams(l) : standings(l).then((s) => s.groups.flatMap((g) => g.entries.map((e) => ({ league: l, team: e.team }))))).catch(() => [])))
+	teamsPromise ??= Promise.all(leagues.map((l) => (l.id === 'ncaab' || l.id === 'cfb' ? collegeTeams(l) : standings(l).then((s) => s.groups.flatMap((g) => g.entries.map((e) => ({ league: l, team: e.team }))))).catch(() => [])))
 		.then((all) => all.flat().sort((a, b) => a.team.displayName.localeCompare(b.team.displayName)));
 	return teamsPromise;
 }
