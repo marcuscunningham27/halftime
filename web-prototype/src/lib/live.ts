@@ -11,8 +11,8 @@ const detector = new EventDetector();
 /** Alerts held through quiet hours: the latest per game, so the morning brings current state rather than a pile.
  *  Saved, as they're already logged as sent: a quit or restart before morning would otherwise lose them. */
 const heldKey = 'heldAlerts';
-const held = new Map<string, { title: string; body: string }>(readHeld());
-function readHeld(): [string, { title: string; body: string }][] {
+const held = new Map<string, { title: string; body: string; at: number }>(readHeld());
+function readHeld(): [string, { title: string; body: string; at: number }][] {
 	try {
 		return JSON.parse(localStorage.getItem(heldKey) ?? '[]');
 	} catch {
@@ -72,13 +72,14 @@ function process(old: Game[], fresh: Game[]) {
 			if (!shouldNotify(e, g) || !markSent(`${g.id}-${e.key}`)) continue;
 			const title = `${g.away.team.shortName} at ${g.home.team.shortName} · ${e.headline}`;
 			if (quiet) {
-				held.set(g.id, { title, body: e.body });
+				held.set(g.id, { title, body: e.body, at: Date.now() });
 				saveHeld();
 			} else notify(title, e.body);
 		}
 	}
 	if (!quiet && held.size) {
-		for (const { title, body } of held.values()) notify(title, body);
+		// Only what's from the night just gone: one left from days ago, with the app closed since, is old news.
+		for (const { title, body, at } of held.values()) if (Date.now() - at < 12 * 3_600_000) notify(title, body);
 		held.clear();
 		saveHeld();
 	}

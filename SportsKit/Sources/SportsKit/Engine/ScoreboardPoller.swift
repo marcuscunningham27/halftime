@@ -81,8 +81,11 @@ public final class ScoreboardPoller {
                 if case .failure(let error) = result { error } else { nil }
             }
             if !results.isEmpty, failures.count == results.count { throw failures[0] }
-            // A league that failed keeps its last games, so when it's back the change is still seen and alerted.
-            var games = results.flatMap { id, result in (try? result.get()) ?? self.games.filter { $0.leagueID == id } }
+            // A league that failed keeps its last games, so when it's back the change is still seen and alerted;
+            // not last launch's cached ones, or changes made while the app was closed would alert.
+            var games = results.flatMap { id, result in
+                (try? result.get()) ?? (showingCache ? [] : self.games.filter { $0.leagueID == id })
+            }
             for game in carried where !games.contains(where: { $0.id == game.id }) {
                 guard let league = leagues.first(where: { $0.id == game.leagueID }) else { continue }
                 // On a failed fetch keep the last copy, so the next poll tries again instead of dropping it.
